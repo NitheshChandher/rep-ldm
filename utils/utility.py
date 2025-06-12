@@ -35,6 +35,7 @@ def decode_img_latents(latents, config, vae=None):
         imgs = imgs.cpu().permute(0, 2, 3, 1).numpy()  # (B,H,W,C)
         imgs = (imgs * 255).round().astype(np.uint8)
         pil_imgs = [Image.fromarray(img) for img in imgs]
+    del vae
     return pil_imgs
 
 import torch
@@ -92,5 +93,5 @@ def produce_latents(config, encoder_hidden_states, unet, seed=42, noise_schedule
                     noise_pred = unet(latents, t)['sample']
             latents = scheduler.step(noise_pred, t, latents)['prev_sample']
             progress_bar.update(1)
-    del vae, unet, scheduler  
+    del unet, scheduler  
     return latents
