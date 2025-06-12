@@ -10,7 +10,7 @@ from accelerate.logging import get_logger
 from accelerate.utils import set_seed
 from diffusers import VQModel, AutoencoderKL, DDPMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
-from lr_scheduler import LambdaLinearScheduler
+from utils.lr_scheduler import LambdaLinearScheduler
 from tqdm.auto import tqdm
 import transformers
 import diffusers
@@ -124,10 +124,10 @@ def setup(config):
     elif config["lr_scheduler"] == "lambdalinear":
         lr_scheduler = LambdaLinearScheduler(
             warm_up_steps=[10000],
-            f_min=[1.],
+            f_min=[0.1],
             f_max=[1.],
             f_start=[1e-6],
-            cycle_lengths=[10000000000000],
+            cycle_lengths=[1000000],
         )
     else:
         raise ValueError(f"Unknown lr_scheduler {config['lr_scheduler']}")
@@ -157,7 +157,7 @@ def setup(config):
 
 def train_epoch(
     vae, unet, train_dataloader, accelerator, optimizer, lr_scheduler,
-    noise_scheduler, progress_bar, config, checkpoint, epoch
+    noise_scheduler, progress_bar, config, epoch
 ):
     """
     Train the model for one epoch.
@@ -202,7 +202,10 @@ def train_epoch(
                 global_step += 1
 
             optimizer.step()
-            lr_scheduler.step()
+            if config["lr_scheduler"] == "constant":
+                lr_scheduler.step()
+            else:
+                lr_scheduler(global_step)
             logs = {"train/loss_per_step": loss.detach().item(), "step": global_step}
             progress_bar.set_postfix(**logs)
             if accelerator.is_main_process:
@@ -278,14 +281,27 @@ def objective(config):
             vae, unet, train_dataloader, accelerator, optimizer, lr_scheduler,
             noise_scheduler, progress_bar, config, epoch=epoch
         )
-        val_loss = eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator)
-        if accelerator.is_main_process:
-            wandb.log({
-                "train/loss_epoch": sum(train_loss) / len(train_loss),
-                "val/loss_epoch": sum(val_loss) / len(val_loss),
-                "epoch": epoch
-            }, step=epoch)
-
+        if config["validation"] is True:
+            if epoch % 10 == 0:
+                val_loss = eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator)
+                if accelerator.is_main_process:
+                    wandb.log({
+                        "train/loss_epoch": sum(train_loss) / len(train_loss),
+                        "val/loss_epoch": sum(val_loss) / len(val_loss),
+                        "epoch": epoch
+                    }, step=epoch)
+            else:    
+                if accelerator.is_main_process:
+                    wandb.log({
+                        "train/loss_epoch": sum(train_loss) / len(train_loss),
+                        "epoch": epoch
+                    }, step=epoch)
+        else:
+            if accelerator.is_main_process:
+                    wandb.log({
+                        "train/loss_epoch": sum(train_loss) / len(train_loss),
+                        "epoch": epoch
+                    }, step=epoch)
     if accelerator.is_main_process:
         wandb.finish()
     print("Training complete.")
@@ -294,7 +310,7 @@ def main():
     """
     Main entry point. Parses arguments, loads config, and launches training.
     """
-    parser = argparse.ArgumentParser(description="Train RCG Latent Diffusion Model")
+    parser = argparse.ArgumentParser(description="Train Representation Conditioned Latent Diffusion Model")
     parser.add_argument("--config", type=str, required=True, help="Path to config YAML file")
     args = parser.parse_args()
 

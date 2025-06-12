@@ -1,6 +1,8 @@
 from PIL import Image
 import torch
 import numpy as np
+from torch import autocast
+from tqdm.auto import tqdm
 from diffusers import AutoencoderKL, VQModel
 from diffusers import DDPMScheduler
 
@@ -73,22 +75,22 @@ def produce_latents(config, encoder_hidden_states, unet, seed=42, noise_schedule
     latents = torch.randn(latent_shape, device=device)
 
     # Set number of inference steps
-    num_inference_steps = steps or noise_scheduler.config.num_train_timesteps
+    num_inference_steps = 100
     scheduler = noise_scheduler
     scheduler.set_timesteps(num_inference_steps, device=device)
 
     # Denoising loop
-    for t in scheduler.timesteps:
-        # UNet expects (B, C, H, W), timestep, and encoder_hidden_states
-        with torch.no_grad():
-            model_pred = unet(latents, t, encoder_hidden_states).sample
-
-        if scheduler.config.prediction_type == "epsilon":
-            latents = scheduler.step(model_pred, t, latents).prev_sample
-        elif scheduler.config.prediction_type == "v_prediction":
-            v = model_pred
-            latents = scheduler.step(v, t, latents).prev_sample
-        else:
-            raise ValueError(f"Unknown prediction type {scheduler.config.prediction_type}")
-
+    with autocast('cuda'):
+        progress_bar = tqdm(range(0, num_inference_steps))
+        progress_bar.set_description("Steps")
+        for i, t in enumerate(scheduler.timesteps):
+            # UNet expects (B, C, H, W), timestep, and encoder_hidden_states
+            with torch.no_grad():
+                if config["method"] == 'dino-ldm' or config["method"] == 'clip-ldm':
+                    noise_pred = unet(latents, t, encoder_hidden_states)['sample']    
+                else:    
+                    noise_pred = unet(latents, t)['sample']
+            latents = scheduler.step(noise_pred, t, latents)['prev_sample']
+            progress_bar.update(1)
+    del vae, unet, scheduler  
     return latents
