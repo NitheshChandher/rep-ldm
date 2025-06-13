@@ -9,7 +9,7 @@ seed: 42
 resolution: 512                                                            
 batch_size: 8                                            
 dataset: ffhq                                            
-trials: dinov2-ldm-ffhq                               
+trials: dinov2-ldm-ffhq                              
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
@@ -26,7 +26,7 @@ lr_scheduler: lambdalinear
 num_train_epochs: 100                                      
 gradient_accumulation_steps: 1                             
 name: dinov2-ldm-unet-ffhq                                 
-checkpoint_epoch: 20                                                                            
+checkpoint_epoch: 10                                                                            
 prev_step: 0
 validation: True
 train_from_scratch: True

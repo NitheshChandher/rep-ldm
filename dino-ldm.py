@@ -63,7 +63,7 @@ def setup(config):
             project=config.get("wandb_project", config["name"]),
             name=config.get("name", None),
             config=config,
-            dir=os.path.join(root_path, config["trials"], "wandb"),
+            dir=root_path,
         )
 
     # Load noise scheduler and VAE
@@ -206,10 +206,10 @@ def train_epoch(
                 lr_scheduler.step()
             else:
                 lr_scheduler(global_step)
-            logs = {"train/loss_per_step": loss.detach().item(), "step": global_step}
+            logs = {"train/loss_per_step": loss.detach().item()}
             progress_bar.set_postfix(**logs)
             if accelerator.is_main_process:
-                wandb.log(logs, step=global_step)
+                wandb.log(logs, step=global_step, commit=False)
             train_loss.append(loss.detach().item())
 
     # Optionally log checkpoint info
@@ -276,32 +276,31 @@ def objective(config):
      lr_scheduler, noise_scheduler, max_train_steps) = setup(config)
 
     progress_bar = tqdm(range(max_train_steps), desc="Training Progress")
+    wandb.define_metric("global_step", hidden=True)
+    wandb.define_metric("train/loss_per_step", step_metric="global_step")
+    wandb.define_metric("train/loss_per_epoch", step_metric="epoch")
+    wandb.define_metric("val/loss_per_epoch", step_metric="epoch")
+
     for epoch in range(config["num_train_epochs"]):
         train_loss = train_epoch(
             vae, unet, train_dataloader, accelerator, optimizer, lr_scheduler,
             noise_scheduler, progress_bar, config, epoch=epoch
         )
+        if accelerator.is_main_process:
+            wandb.log({
+                    "train/loss_per_epoch": sum(train_loss) / len(train_loss),
+                    "epoch": epoch
+                })
+    
         if config["validation"] is True:
             if epoch % 10 == 0:
                 val_loss = eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator)
                 if accelerator.is_main_process:
                     wandb.log({
-                        "train/loss_epoch": sum(train_loss) / len(train_loss),
-                        "val/loss_epoch": sum(val_loss) / len(val_loss),
+                        "val/loss_per_epoch": sum(val_loss) / len(val_loss),
                         "epoch": epoch
-                    }, step=epoch)
-            else:    
-                if accelerator.is_main_process:
-                    wandb.log({
-                        "train/loss_epoch": sum(train_loss) / len(train_loss),
-                        "epoch": epoch
-                    }, step=epoch)
-        else:
-            if accelerator.is_main_process:
-                    wandb.log({
-                        "train/loss_epoch": sum(train_loss) / len(train_loss),
-                        "epoch": epoch
-                    }, step=epoch)
+                        })
+            
     if accelerator.is_main_process:
         wandb.finish()
     print("Training complete.")
