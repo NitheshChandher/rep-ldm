@@ -29,7 +29,7 @@ module load Anaconda
 conda activate di
 
 # Navigate to DINO-LDM directory
-cd ~/rep-ldm
+cd /proj/dcdl/users/gabei62/rep-ldm
 
 # Start training
 accelerate launch dino-ldm.py --config="configs/ffhq.yaml"

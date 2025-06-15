@@ -65,7 +65,10 @@ def setup(config):
             config=config,
             dir=root_path,
         )
-
+        wandb.define_metric("global_step", hidden=True)
+        wandb.define_metric("train/loss_per_step", step_metric="global_step")
+        wandb.define_metric("train/loss_per_epoch", step_metric="epoch")
+        wandb.define_metric("val/loss_per_epoch", step_metric="epoch")
     # Load noise scheduler and VAE
     noise_scheduler = DDPMScheduler.from_pretrained(
         config["pretrained_model_name_or_path"], subfolder="scheduler"
@@ -276,10 +279,6 @@ def objective(config):
      lr_scheduler, noise_scheduler, max_train_steps) = setup(config)
 
     progress_bar = tqdm(range(max_train_steps), desc="Training Progress")
-    wandb.define_metric("global_step", hidden=True)
-    wandb.define_metric("train/loss_per_step", step_metric="global_step")
-    wandb.define_metric("train/loss_per_epoch", step_metric="epoch")
-    wandb.define_metric("val/loss_per_epoch", step_metric="epoch")
 
     for epoch in range(config["num_train_epochs"]):
         train_loss = train_epoch(
