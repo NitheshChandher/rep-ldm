@@ -38,9 +38,7 @@ def decode_img_latents(latents, config, vae=None):
     del vae
     return pil_imgs
 
-import torch
-
-def produce_latents(config, encoder_hidden_states, unet, seed=42, noise_scheduler=None, steps=None, device=None):
+def produce_latents(config, unet, seed=42, encoder_hidden_states=None, noise_scheduler=None, steps=None, device=None):
     """
     Generates denoised latents from random noise, conditioned on encoder_hidden_states, using the UNet and DDPM scheduler.
 
@@ -57,7 +55,11 @@ def produce_latents(config, encoder_hidden_states, unet, seed=42, noise_schedule
         torch.Tensor: Denoised latents of shape (B, C, H, W).
     """
     torch.manual_seed(seed)
-    batch_size = encoder_hidden_states.shape[0]
+    if encoder_hidden_states is None:
+        batch_size = 1
+    else:
+        batch_size = encoder_hidden_states.shape[0]
+        
     latent_shape = (
         batch_size,
         config["channels"],
