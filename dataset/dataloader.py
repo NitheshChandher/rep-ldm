@@ -44,8 +44,12 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
         elif dataset_name == "ffhq":
             train_dir = os.path.join(data_dir, "train")
             val_dir = os.path.join(data_dir, "test")
-            rep_train_dir = os.path.join(rep_dir, "train")
-            rep_val_dir = os.path.join(rep_dir, "test")
+            if rep_dir is not None:
+                rep_train_dir = os.path.join(rep_dir, "train")
+                rep_val_dir = os.path.join(rep_dir, "test")
+            else:
+                rep_train_dir = None
+                rep_val_dir = None
             train_dataset = FFHQ(image_dir=train_dir, rep_dir=rep_train_dir, transform=transform)
             val_dataset = FFHQ(image_dir=val_dir, rep_dir=rep_val_dir, transform=transform)  
             train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
@@ -53,9 +57,13 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
 
         elif dataset_name == "pcam":
             train_dir = os.path.join(data_dir, "train")
-            val_dir = os.path.join(data_dir, "val")
-            rep_train_dir = os.path.join(rep_dir, "train")
-            rep_val_dir = os.path.join(rep_dir, "val")
+            val_dir = os.path.join(data_dir, "test")
+            if rep_dir is not None:
+                rep_train_dir = os.path.join(rep_dir, "train")
+                rep_val_dir = os.path.join(rep_dir, "test")
+            else:
+                rep_train_dir = None
+                rep_val_dir = None
             train_dataset = PCAMDataset(image_dir=train_dir, rep_dir=rep_train_dir, transform=transform)
             val_dataset = PCAMDataset(image_dir=val_dir, rep_dir=rep_val_dir, transform=transform)
             train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)

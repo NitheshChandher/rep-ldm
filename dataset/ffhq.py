@@ -40,14 +40,16 @@ class FFHQ(Dataset):
             image = self.transform(image)
 
         # Load corresponding .npy representation
-        rep_name = os.path.splitext(img_name)[0] + ".npy"  # Change extension to .npy
-        rep_path = os.path.join(self.rep_dir, rep_name)
-        
-        try:
-            representation = np.load(rep_path)  # Load as NumPy array
-            representation = torch.tensor(representation, dtype=torch.float32)  # Convert to tensor
-        except FileNotFoundError:
-            representation = torch.zeros(1)  # Default if representation file is missing
-            print(f"Representation file not found for {img_name}")
-
+        rep_name = os.path.splitext(img_name)[0] + ".npy"
+        if self.rep_dir is not None:  
+            rep_path = os.path.join(self.rep_dir, rep_name)
+            
+            try:
+                representation = np.load(rep_path)  # Load as NumPy array
+                representation = torch.tensor(representation, dtype=torch.float32)  # Convert to tensor
+            except FileNotFoundError:
+                representation = torch.zeros(1)  # Default if representation file is missing
+                print(f"Representation file not found for {img_name}")
+        else:
+            representation = torch.zeros(1)
         return image, representation

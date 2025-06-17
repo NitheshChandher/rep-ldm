@@ -1,0 +1,38 @@
+#=== Directories ===#
+output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
+data_dir: /scratch/local/rep-ldm/ffhq/images/ffhq512                                 
+pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
+
+#=== Data Setup ===# 
+seed: 42                                                                            
+resolution: 512                                                            
+batch_size: 8                                            
+dataset: ffhq                                            
+trials: baseline-ffhq                              
+
+#=== Pre-trained Encoder Config ===#
+encoder_name: KL                                             
+channels: 4                                                                                  
+
+#=== Training U-Net ===#
+lr: 0.00005                                                                        
+beta_1: 0.9                                                           
+beta_2:  0.999                                                
+weight_decay: 0.001                                           
+lr_scheduler: lambdalinear                                       
+num_train_epochs: 100                                      
+gradient_accumulation_steps: 1                             
+name: baseline-unet-ffhq                                 
+checkpoint_epoch: 10                                                                            
+prev_step: 0
+validation: True
+train_from_scratch: True
+
+#=== Sampling U-Net ===#
+method: baseline
+scheduler: ddpm
+noise_strength: 0.0
+guidance_scale: 6
+num_samples: 8
+infsteps: 100 
+sampling: seed  
