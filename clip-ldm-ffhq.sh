@@ -10,7 +10,7 @@
 
 # Define paths
 export ZIP_DATA=/proj/dcdl/users/gabei62/rep-ldm/data/ffhq512.zip
-export ZIP_REP=/proj/dcdl/users/gabei62/rep-ldm/rep/ffhq512-dinov2.zip
+export ZIP_REP=/proj/dcdl/users/gabei62/rep-ldm/rep/ffhq512-clip.zip
 export SCRATCH_DIR=/scratch/local/rep-ldm/ffhq/images
 export SCRATCH_REP_DIR=/scratch/local/rep-ldm/ffhq/representations
 
@@ -32,4 +32,4 @@ conda activate di
 cd /proj/dcdl/users/gabei62/rep-ldm
 
 # Start training
-accelerate launch dino-ldm.py --config="configs/dino.yaml"
+accelerate launch dino-ldm.py --config="configs/clip.yaml"
