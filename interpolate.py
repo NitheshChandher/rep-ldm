@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--sampling", type=str, default="linear-spherical", choices=["linear", "spherical", "linear-spherical"], help="Interpolate: 1) only rep, 2) only noise maps, or 3) both")
     parser.add_argument("--index1", type=int, default=0, help="Index of the first image in the dataset")
     parser.add_argument("--index2", type=int, default=1, help="Index of the second image in the dataset")
-    parser.add_argument("--res", type=int, default=256, help="Resolution of the generated images")
+    parser.add_argument("--res", type=int, default=512, help="Resolution of the generated images")
     parser.add_argument("--eta", type=float, default=1)
     parser.add_argument("--skip", type=int, default=36)
     
@@ -189,7 +189,7 @@ def main():
     fig, ax = plt.subplots(1, 9, figsize=(5*9, 5))
     for i in range(len(alpha)):
         ax[i].imshow(pil_outs[i])
-    plt.savefig('compare-512.png')
+    plt.savefig(f'{save_path}/compare-512.png')
 """
     # Plot
     plt.figure(figsize=[2.5*K, 5])
