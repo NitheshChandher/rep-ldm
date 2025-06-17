@@ -11,6 +11,7 @@ from PIL import Image
 import numpy as np
 import random
 import torch_fidelity
+import pandas as pd
 
 def seed_dataset(args):
     """
@@ -27,7 +28,7 @@ def seed_dataset(args):
     dtype = torch.float32
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    save_path = os.path.join(args.save_path, args.model, args.dataset, args.method,args.seed)
+    save_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
 
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
@@ -43,15 +44,15 @@ def seed_dataset(args):
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae", revision=None)
     vae.requires_grad_(False)
 
-    _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=args.data_dir, rep_dir=args.rep_dir)
+    _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=None, rep_dir=args.rep_dir)
  
     unet.eval()
     if args.model == 'dino-ldm' or args.model == 'clip-ldm':
-        for _, batch in enumerate(dataloader):
+        for step, batch in enumerate(dataloader):
             latents = torch.randn((args.bs, 4, args.height // 8, args.width // 8))
             latents = latents.to(device)
             scheduler.set_timesteps(args.num_inference_steps)
-            encoder_hidden_states = batch[1].to(device, dtype=dtype).unsqueeze(1)
+            encoder_hidden_states = batch.to(device, dtype=dtype).unsqueeze(1)  # Add a channel dimension
             with autocast('cuda'):
                 progress_bar = tqdm(range(0, args.num_inference_steps))
                 progress_bar.set_description("Steps")
@@ -125,15 +126,15 @@ def parse_args():
         "--model",
         type=str,
         default="dino-ldm",
-        required=False,
+        required=True,
         help="Choose among dino-ldm or clip-ldm or diffae or u-ldm",
     )
 
     parser.add_argument(
         "--method",
         type=str,
-        default="dino-ldm",
-        required=False,
+        default="seed-dataset",
+        required=True,
         help="Choose among seed-dataset or interpolate-dataset",
     )
 
@@ -146,25 +147,33 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--data_dir",
+        "--test_dir",
         type=str,
-        default='./data',
-        required=False,
-        help="Path to the dataset files",
-    )
+        default='./data/ffhq512/test',
+        required=True,
+        help="Path to the test images",
+    ) 
 
     parser.add_argument(
         "--rep_dir",
         type=str,
-        default='./rep',
-        required=False,
+        default='./rep/ffhq512-dinov2',
+        required=True,
         help="Path to the representation files",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        required=False,
+        help="Select Seed value",
     )
 
     parser.add_argument(
         "--bs",
         type=int,
-        default=32,
+        default=10,
         required=False,
         help="Select the batch size for the dataloader depending on the device memory",
     )
@@ -202,14 +211,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        required=False,
-        help="Select Seed value",
-    )
-
-    parser.add_argument(
         "--scheduler",
         type=str,
         default="ddpm",
@@ -217,12 +218,21 @@ def parse_args():
         help="Select the scheduler",
     )
 
+    parser.add_argument(
+        "--pretrained_model_name_or_path",
+        type=str,
+        default="CompVis/stable-diffusion-v1-4",
+        required=False,
+        help="Path to the pretrained model",
+    )
     return parser.parse_args()
 
 def main():
     args = parse_args()
-    if args.method not in ['dino-ldm', 'clip-ldm', 'diffae', 'u-ldm']:
+    if args.model not in ['dino-ldm', 'clip-ldm', 'diffae', 'u-ldm']:
         raise ValueError("Invalid method! Choose among dino-ldm, clip-ldm, diffae, or u-ldm")
+    if args.method not in ['seed-dataset', 'interpolate-dataset']:
+        raise ValueError("Invalid method! Choose among seed-dataset or interpolate-dataset")
     if args.dataset not in ['ffhq', 'celeba', 'subset-imagenet']:
         raise ValueError("Invalid dataset! Choose among ffhq, celeba, or subset-imagenet")
     
@@ -234,11 +244,52 @@ def main():
         print(f'{args.dataset} folder already exists in {args.save_path}/{args.model}')
     
     if args.method == 'seed-dataset':
-            seed_dataset(args)
+        seed_dataset(args)
+        model = args.model
+        method = args.method
+        dataset = args.dataset
+        seed = args.seed
+        save_path_1 = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
     elif args.method == 'interpolate-dataset':
-            print("Interpolate dataset functionality is not implemented yet.")
+        print("Interpolate dataset functionality is not implemented yet.")
+        model = args.model
+        method = args.method
+        dataset = args.dataset
+        seed = args.seed
     else:
         raise ValueError("Invalid method! Choose among seed-dataset or interpolate-dataset")
+    
+    filename = "results.csv"
+    save_path_2 = args.test_dir
+
+    # Calculate metrics
+    metrics_dict = torch_fidelity.calculate_metrics(
+        input1=save_path_1, 
+        input2=save_path_2, 
+        cuda=True, 
+        isc=True, 
+        fid=True, 
+        kid=True, 
+        prc=True, 
+        verbose=False,
+    )
+
+    metrics_dict['model'] = model
+    metrics_dict['method'] = method
+    metrics_dict['dataset'] = dataset
+    metrics_dict['seed'] = seed
+
+    # Save metrics to CSV
+    metrics_df = pd.DataFrame([metrics_dict])
+    if os.path.exists(filename):
+        existing_df = pd.read_csv(filename)
+        combined_df = pd.concat([existing_df, metrics_df], ignore_index=True)
+    else:
+        combined_df = metrics_df
+
+    # Save to CSV
+    combined_df.to_csv(filename, index=False)
+    print(f"Metrics and metadata added to '{filename}'")
     
 if __name__ == "__main__":
     main()

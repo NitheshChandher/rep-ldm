@@ -24,7 +24,7 @@ def main():
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model checkpoint")
     parser.add_argument("--rep_path", type=str, default="rep/ffhq/", help="Path to the directory containing dinov2 representations vectors")
     parser.add_argument("--index", type=int, default=0, help="Index of the first image in the dataset")
-    parser.add_argument("--res", type=int, default=256, help="Resolution of the generated images")
+    parser.add_argument("--res", type=int, default=512, help="Resolution of the generated images")
     parser.add_argument("--eta", type=float, default=1)
     parser.add_argument("--skip", type=int, default=36)
     
@@ -136,7 +136,7 @@ def main():
     axes[1].axis("off")
 
     for i in range(len(imgs)-1):
-        axes[i + 2].imshow(imgs[i])
+        axes[i + 2].imshow(imgs[i+1])
         axes[i + 2].set_title(f"Sample {i + 1}")
         axes[i + 2].axis("off")
     plt.tight_layout()
