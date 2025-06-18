@@ -5,6 +5,7 @@ from dataset.celeba import CelebA
 from dataset.ffhq import FFHQ
 from dataset.pcam import PCAMDataset
 from dataset.representation import RepresentationDataset
+from dataset.custom import ImageDataset
 
 def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), data_dir=None, rep_dir=None, transform=True, shuffle=True):
     """
@@ -39,6 +40,11 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
             val_dataset = CelebA(root=data_dir, rep_root=rep_dir, split='valid', transform=transform)
 
             train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
+            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+        
+        elif dataset_name == "celeba-hq":
+            val_dataset = ImageDataset(image_dir=data_dir, rep_dir=rep_dir, transform=transform)
+            train_dataloader = None
             val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
         elif dataset_name == "ffhq":
@@ -79,6 +85,11 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
             train_dataset = RepresentationDataset(rep_dir=rep_train_dir)
             val_dataset = RepresentationDataset(rep_dir=rep_val_dir)
             train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
+            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+
+        elif dataset_name == "celeba-hq":
+            val_dataset = RepresentationDataset(rep_dir=rep_dir)
+            train_dataloader = None
             val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
         else:
             raise ValueError("Representations Not Available! Incorrect input config for representation directory")
