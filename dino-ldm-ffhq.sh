@@ -32,4 +32,4 @@ conda activate di
 cd /proj/dcdl/users/gabei62/rep-ldm
 
 # Start training
-accelerate launch dino-ldm.py --config="configs/dino.yaml"
+accelerate launch rep-ldm.py --config="configs/ffhq/dino.yaml"

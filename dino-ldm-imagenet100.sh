@@ -5,15 +5,15 @@
 #SBATCH -A berzelius-2025-21
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=nithesh.chandher.karthikeyan@liu.se
-#SBATCH --gpus 2
+#SBATCH --gpus 4
 #SBATCH -t 3-00:00:00
 
 # Define paths
-export ZIP_DATA=/proj/dcdl/users/gabei62/rep-ldm/data/ffhq512.zip
-export SCRATCH_DIR=/scratch/local/rep-ldm/ffhq/images
+export ZIP_DATA=/proj/dcdl/users/gabei62/rep-ldm/data/imagenet100.zip
+export SCRATCH_DIR=/scratch/local/rep-ldm/imagenet100
 
 # Create scratch directories
-mkdir -p $SCRATCH_DIR 
+mkdir -p $SCRATCH_DIR
 
 # Extract ZIP files
 echo "Extracting dataset ZIP..."
@@ -27,4 +27,4 @@ conda activate di
 cd /proj/dcdl/users/gabei62/rep-ldm
 
 # Start training
-accelerate launch baseline.py --config="configs/ffhq/baseline.yaml"
+accelerate launch rep-ldm.py --config="configs/imagenet-100/dino.yaml"
