@@ -8,109 +8,74 @@ from transformers import ViTModel
 from torch import autocast
 from tqdm.auto import tqdm
 from PIL import Image
+from eval.seed_dataset import seed_dataset
+from eval.perturbe_dataset import perturbe_dataset
 import numpy as np
 import random
 import torch_fidelity
 import pandas as pd
 
-def seed_dataset(args):
-    """
-    Generate images using a trained dino-ldm model and save them to disk.
-    """
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-    torch.cuda.empty_cache()
-    
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
-    dtype = torch.float32
+def torch_metrics(args, gen_path, alpha=None):
+    model = args.model
+    method = args.method
+    dataset = args.dataset
+    seed = args.seed
+    filename = "results.csv"
+    real_path = args.test_dir
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    save_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+    # Calculate metrics
+    metrics_dict = torch_fidelity.calculate_metrics(
+        input1=gen_path, 
+        input2=real_path, 
+        cuda=True, 
+        isc=True, 
+        fid=True, 
+        kid=True, 
+        prc=True, 
+        verbose=False,
+    )
 
-    if not os.path.exists(save_path):
-        os.makedirs(save_path, exist_ok=True)
-        
-    unet = torch.load(args.model_path, map_location=device)
-    unet.to(device)
+    metrics_dict['model'] = model
+    metrics_dict['method'] = method
+    metrics_dict['dataset'] = dataset
 
-    if args.scheduler=="ddpm":
-        scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    if args.method == 'seed-dataset':
+        metrics_dict['seed'] = seed
     else:
-        scheduler = DDIMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
-            
-    vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae", revision=None)
-    vae.requires_grad_(False)
+        metrics_dict['seed'] = 'N/A'
 
-    _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=None, rep_dir=args.rep_dir)
- 
-    unet.eval()
-    if args.model == 'dino-ldm' or args.model == 'clip-ldm':
-        for step, batch in enumerate(dataloader):
-            latents = torch.randn((args.bs, 4, args.height // 8, args.width // 8))
-            latents = latents.to(device)
-            scheduler.set_timesteps(args.num_inference_steps)
-            encoder_hidden_states = batch.to(device, dtype=dtype).unsqueeze(1)  # Add a channel dimension
-            with autocast('cuda'):
-                progress_bar = tqdm(range(0, args.num_inference_steps))
-                progress_bar.set_description("Steps")
-                for i, t in enumerate(scheduler.timesteps):
-                    with torch.no_grad(): 
-                        noise_pred = unet(latents, t, encoder_hidden_states)['sample']    
-                    latents = scheduler.step(noise_pred, t, latents)['prev_sample']
-                    progress_bar.update(1)
-            latents = 1 / 0.18215 * latents
-            vae = vae.to(device)
-            with torch.no_grad():
-                decoder_output = vae.decode(latents)
-                imgs = decoder_output.sample if hasattr(decoder_output, 'sample') else decoder_output
-            imgs = (imgs / 2 + 0.5).clamp(0, 1)
-            imgs = imgs.detach().cpu().permute(0, 2, 3, 1).numpy()
-            imgs = (imgs * 255).round().astype('uint8')
-            pil_images = [Image.fromarray(image) for image in imgs]
-            for idx, pil_img in enumerate(pil_images):
-                img_path = os.path.join(save_path, f"image_{step}_{idx}.png")
-                pil_img.save(img_path)
-                    
-            del latents, encoder_hidden_states, decoder_output, imgs, pil_images, noise_pred, batch
-            torch.cuda.empty_cache()
-            print(f"Batch {step+1}/{len(dataloader)} is Saved!")    
-    
-    elif args.model == 'diffae':
-        raise NotImplementedError("DiffAE model is not supported yet.")
-    
+    if args.method == 'perturbate-dataset':
+        metrics_dict['noise-strength'] = alpha
     else:
-        for step in range(0,len(dataloader)):
-            latents = torch.randn((args.bs, 4, args.height // 8, args.width // 8))
-            latents = latents.to(device)
-            scheduler.set_timesteps(args.num_inference_steps)
-            with autocast('cuda'):
-                progress_bar = tqdm(range(0, args.num_inference_steps))
-                progress_bar.set_description("Steps")
-                for i, t in enumerate(scheduler.timesteps):
-                    with torch.no_grad(): 
-                        noise_pred = unet(latents, t)['sample']    
-                    latents = scheduler.step(noise_pred, t, latents)['prev_sample']
-                    progress_bar.update(1)
-            latents = 1 / 0.18215 * latents
-            vae = vae.to(device)
-            with torch.no_grad():
-                decoder_output = vae.decode(latents)
-                imgs = decoder_output.sample if hasattr(decoder_output, 'sample') else decoder_output
-            imgs = (imgs / 2 + 0.5).clamp(0, 1)
-            imgs = imgs.detach().cpu().permute(0, 2, 3, 1).numpy()
-            imgs = (imgs * 255).round().astype('uint8')
-            pil_images = [Image.fromarray(image) for image in imgs]
-            for idx, pil_img in enumerate(pil_images):
-                img_path = os.path.join(save_path, f"image_{step}_{idx}.png")
-                pil_img.save(img_path)
-                    
-            del latents, decoder_output, imgs, pil_images, noise_pred,
-            torch.cuda.empty_cache()
-            print(f"Batch {step+1}/{len(dataloader)} is Saved!")
+        metrics_dict['noise-strength'] = 'N/A'
 
+    metrics_dict['interpolation'] = 'N/A'
+    metrics_dict['num_inference_steps'] = args.num_inference_steps
+    metrics_dict['scheduler'] = args.scheduler
+    
+    # Save metrics to CSV
+    metrics_df = pd.DataFrame([metrics_dict])
+
+    if os.path.exists(filename):
+        # Read existing CSV
+        existing_df = pd.read_csv(filename)
+
+        # Check if this exact row already exists
+        duplicate = (existing_df == metrics_df.iloc[0]).all(axis=1).any()
+
+        if duplicate:
+            print("This row already exists in the CSV. Skipping append.")
+        else:
+            # Append and save
+            updated_df = pd.concat([existing_df, metrics_df], ignore_index=True)
+            updated_df.to_csv(filename, index=False)
+            print(f"Evaluation of {args.method} for {args.model} trained on {args.dataset} added!")
+
+    else:
+        # Create new CSV with this row
+        metrics_df.to_csv(filename, index=False)
+        print("Created new CSV file and added the evaluation metrics.")
+    return metrics_df
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Quantitative Evaluation of Generative Models")
@@ -135,7 +100,7 @@ def parse_args():
         type=str,
         default="seed-dataset",
         required=True,
-        help="Choose among seed-dataset or interpolate-dataset",
+        help="Choose among perturbe-dataset or interpolate-dataset",
     )
 
     parser.add_argument(
@@ -229,10 +194,10 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if args.model not in ['dino-ldm', 'clip-ldm', 'diffae', 'u-ldm']:
-        raise ValueError("Invalid method! Choose among dino-ldm, clip-ldm, diffae, or u-ldm")
-    if args.method not in ['seed-dataset', 'interpolate-dataset']:
-        raise ValueError("Invalid method! Choose among seed-dataset or interpolate-dataset")
+    if args.model not in ['dino-ldm', 'clip-ldm', 'diffae', 'baseline']:
+        raise ValueError("Invalid method! Choose among dino-ldm, clip-ldm, diffae, or baseline")
+    if args.method not in ['seed-dataset', 'perturbate-dataset', 'interpolate-dataset']:
+        raise ValueError("Invalid method! Choose among perturbate-dataset or interpolate-dataset")
     if args.dataset not in ['ffhq', 'celeba', 'subset-imagenet']:
         raise ValueError("Invalid dataset! Choose among ffhq, celeba, or subset-imagenet")
     
@@ -245,51 +210,24 @@ def main():
     
     if args.method == 'seed-dataset':
         seed_dataset(args)
-        model = args.model
-        method = args.method
-        dataset = args.dataset
-        seed = args.seed
-        save_path_1 = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+        gen_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+        metric_dict = torch_metrics(args, gen_path)
+        print("Metric Info:", metric_dict)
+
+    elif args.method == 'perturbate-dataset':
+        perturbe_dataset(args)
+        save_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+        alpha = np.linspace(0, 1, 5)
+        for lamda in alpha:
+            gen_path = os.path.join(save_path, str(lamda))
+            metric_dict = torch_metrics(args, gen_path)
+            print("Metric Info:", metric_dict)
+
     elif args.method == 'interpolate-dataset':
-        print("Interpolate dataset functionality is not implemented yet.")
-        model = args.model
-        method = args.method
-        dataset = args.dataset
-        seed = args.seed
+        raise NotImplementedError("Interpolate dataset functionality is not implemented yet.")
     else:
         raise ValueError("Invalid method! Choose among seed-dataset or interpolate-dataset")
     
-    filename = "results.csv"
-    save_path_2 = args.test_dir
-
-    # Calculate metrics
-    metrics_dict = torch_fidelity.calculate_metrics(
-        input1=save_path_1, 
-        input2=save_path_2, 
-        cuda=True, 
-        isc=True, 
-        fid=True, 
-        kid=True, 
-        prc=True, 
-        verbose=False,
-    )
-
-    metrics_dict['model'] = model
-    metrics_dict['method'] = method
-    metrics_dict['dataset'] = dataset
-    metrics_dict['seed'] = seed
-
-    # Save metrics to CSV
-    metrics_df = pd.DataFrame([metrics_dict])
-    if os.path.exists(filename):
-        existing_df = pd.read_csv(filename)
-        combined_df = pd.concat([existing_df, metrics_df], ignore_index=True)
-    else:
-        combined_df = metrics_df
-
-    # Save to CSV
-    combined_df.to_csv(filename, index=False)
-    print(f"Metrics and metadata added to '{filename}'")
     
 if __name__ == "__main__":
     main()
