@@ -3,7 +3,6 @@ import os
 import argparse
 import random
 import torch
-from tqdm import tqdm
 from diffusers import DDIMScheduler, AutoencoderKL
 from dataset.custom import ImageDataset
 from PIL import Image
@@ -13,36 +12,11 @@ from torch import autocast, inference_mode
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-def stochastic_sampling(args, seed, encoder_hidden_states):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
-    model_id = "CompVis/stable-diffusion-v1-4"
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    scheduler = DDIMScheduler.from_config(model_id, subfolder="scheduler")
-    scheduler.set_timesteps(args.num_diffusion_steps)
-    vae = AutoencoderKL.from_pretrained(model_id, subfolder="vae", revision=None).to(device)
-    vae.requires_grad_(False)
-    latents = torch.randn((1, 4, args.res // 8, args.res // 8))
-    latents = latents.to(device)
-
-    progress_bar = tqdm(range(0, int(args.num_diffusion_steps)))
-    progress_bar.set_description("Steps")
-    with autocast("cuda"), inference_mode():
-        unet = torch.load(args.model_path, map_location=device, weights_only=False).to(device)
-        for i, t in enumerate(scheduler.timesteps):
-            with torch.no_grad(): 
-                noise_pred = unet(latents, t, encoder_hidden_states)['sample']    
-            latents = scheduler.step(noise_pred, t, latents)['prev_sample']
-            progress_bar.update(1)
-    return latents
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--device_num", type=int, default=0)
+    parser.add_argument("--cfg_src", type=float, default=1.0)
+    parser.add_argument("--cfg_tar", type=float, default=1.0)
     parser.add_argument("--num_diffusion_steps", type=int, default=100)
     parser.add_argument("--num_samples", type=int, default=4, help="Number of samples to generate")
     parser.add_argument("--data_path", type=str, required=True, help="Path to the dataset folder to load data")
@@ -51,8 +25,17 @@ def main():
     parser.add_argument("--rep_path", type=str, default="rep/ffhq/", help="Path to the directory containing dinov2 representations vectors")
     parser.add_argument("--index", type=int, default=0, help="Index of the first image in the dataset")
     parser.add_argument("--res", type=int, default=512, help="Resolution of the generated images")
+    parser.add_argument("--eta", type=float, default=1)
+    parser.add_argument("--skip", type=int, default=36)
     
     args = parser.parse_args()
+
+    torch.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
+    np.random.seed(42)
+    random.seed(42)
+    model_id = "CompVis/stable-diffusion-v1-4"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if not os.path.exists(args.data_path):
         raise ValueError(f'{args.data_path} does not exist!')
@@ -62,8 +45,8 @@ def main():
         raise ValueError(f'{args.rep_path} does not exist!')
     if not os.path.exists(args.model_path):
         raise ValueError(f'{args.model_path} does not exist!')
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      
+    save_path = os.path.join(args.output_path, "stochastic_variation")
 
     transform = transforms.Compose([
                 transforms.Resize(args.res),    # Resize images to 256x256
@@ -75,22 +58,57 @@ def main():
     dataloader = DataLoader(dataset, batch_size=2, shuffle=False, num_workers=0)
     data_iter = iter(dataloader)
     batch = next(data_iter)
+
     images = batch[0]  
     real_imgs = images.to(device)
     latents = batch[1].unsqueeze(1).to(device)
 
+    cfg_src = args.cfg_src
+    eta = args.eta
+
     x0 = real_imgs[args.index,:,:,:].unsqueeze(0)
     z0 = latents[args.index,:,:].unsqueeze(0)
 
-    save_path = os.path.join(args.output_path, "random-seed")
-    w0_ls = []
-    seeds = [42, 7, 17, 25, 96]  
-    for seed in seeds:
-        print(f"Running stochastic sampling with seed {seed}...")
-        w0 = stochastic_sampling(args, seed=seed, encoder_hidden_states=z0)  
-        w0_ls.append(w0)
-        print(f"Generated Sample for {seed}!")
+    scheduler = DDIMScheduler.from_config(model_id, subfolder="scheduler")
+    scheduler.set_timesteps(args.num_diffusion_steps)
+    vae = AutoencoderKL.from_pretrained(model_id, subfolder="vae", revision=None).to(device)
 
+    with autocast("cuda"), inference_mode():
+        # Encode the input image (x0) into latent space
+        w0 = (vae.encode(x0).latent_dist.mode() * 0.18215).float()
+        del vae
+        # Load the UNet model
+        unet = torch.load(args.model_path, map_location=device, weights_only=False).to(device)
+
+        # Call the inversion forward process, passing scheduler as an argument
+        wt, zs, wts = inversion_forward_process(unet, scheduler, w0, etas=eta,
+                                                encoder_hidden_states=z0,
+                                                cfg_scale=cfg_src,
+                                                prog_bar=True,
+                                                num_inference_steps=args.num_diffusion_steps)
+
+        torch.cuda.empty_cache()   
+
+        w0, _ = inversion_reverse_process(unet, scheduler, xT=wts[args.num_diffusion_steps - args.skip],
+                                        etas=eta, encoder_hidden_states=z0,
+                                        cfg_scales=[args.cfg_tar], prog_bar=True,
+                                        zs=zs[:(args.num_diffusion_steps - args.skip)])
+        print(f"Generated Reconstructed Image!")
+        w0_ls = []
+        w0_ls.append(w0)
+
+        for i in range(args.num_samples):
+            xT = torch.randn_like(wts[args.num_diffusion_steps - args.skip])
+            zs1 = torch.randn_like(zs[:(args.num_diffusion_steps - args.skip)])
+            w0, _ = inversion_reverse_process(unet, scheduler, xT=wts[args.num_diffusion_steps - args.skip],
+                                        etas=eta, encoder_hidden_states=z0,
+                                        cfg_scales=[args.cfg_tar], prog_bar=True,
+                                        zs=zs1)
+                                        #zs=zs[:(args.num_diffusion_steps - args.skip)])
+            w0_ls.append(w0)
+            print(f"Generated Sample {i}!")
+
+    del unet, scheduler
     imgs=[]
     vae = AutoencoderKL.from_pretrained('CompVis/stable-diffusion-v1-4', subfolder="vae", revision=None).to(device)
     for i in range(len(w0_ls)):
@@ -113,13 +131,17 @@ def main():
     axes[0].set_title("Input")
     axes[0].axis("off")
 
-    for i in range(len(imgs)):
-        axes[i + 1].imshow(imgs[i])
-        axes[i + 1].set_title(f"Seed {seeds[i]}")
-        axes[i + 1].axis("off")
+    axes[1].imshow(imgs[0])
+    axes[1].set_title("Reconstruction")
+    axes[1].axis("off")
+
+    for i in range(len(imgs)-1):
+        axes[i + 2].imshow(imgs[i+1])
+        axes[i + 2].set_title(f"Sample {i + 1}")
+        axes[i + 2].axis("off")
     plt.tight_layout()
     os.makedirs(save_path, exist_ok=True)
-    plt.savefig(f'{save_path}/compare_dino-ldm_{args.index}.png', dpi=100, bbox_inches='tight', pad_inches=0, transparent=False)
+    plt.savefig(f'{save_path}/compare_dino-ldm_{args.index}.png', dpi=100, bbox_inches='tight', pad_inches=0, transparent=True)
     plt.close(fig)
 
 if __name__ == "__main__":

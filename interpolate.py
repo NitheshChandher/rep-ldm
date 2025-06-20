@@ -189,7 +189,7 @@ def main():
     fig, ax = plt.subplots(1, 9, figsize=(5*9, 5))
     for i in range(len(alpha)):
         ax[i].imshow(pil_outs[i])
-    plt.savefig(f'{save_path}/compare-512.png')
+    plt.savefig(f'{save_path}/compare_{args.index1}_{args.index2}.png')
 """
     # Plot
     plt.figure(figsize=[2.5*K, 5])
