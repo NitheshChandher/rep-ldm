@@ -60,6 +60,20 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
             val_dataset = FFHQ(image_dir=val_dir, rep_dir=rep_val_dir, transform=transform)  
             train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
             val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+        
+        elif dataset_name == "imagenet-100":
+            train_dir = os.path.join(data_dir, "train")
+            val_dir = os.path.join(data_dir, "val")
+            if rep_dir is not None:
+                rep_train_dir = os.path.join(rep_dir, "train")
+                rep_val_dir = os.path.join(rep_dir, "val")
+            else:
+                rep_train_dir = None
+                rep_val_dir = None
+            train_dataset = ImageDataset(image_dir=train_dir, rep_dir=rep_train_dir, transform=transform)
+            val_dataset = ImageDataset(image_dir=val_dir, rep_dir=rep_val_dir, transform=transform)
+            train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
+            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
         elif dataset_name == "pcam":
             train_dir = os.path.join(data_dir, "train")
@@ -78,6 +92,7 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
         else:
             raise ValueError("Dataset Not Available! Incorrect input config for dataset directory")
     else:
+        # For model evaluation with representations
         if dataset_name == "ffhq":
             rep_train_dir = os.path.join(rep_dir, "train")
             rep_val_dir = os.path.join(rep_dir, "test")
