@@ -14,7 +14,7 @@ import transformers
 import diffusers
 import yaml
 import wandb
-from utils.utility import decode_img_latents, produce_latents
+from utils.utility import decode_img_latents, produce_latents, make_image_grid
 from dataset.dataloader import load_and_prepare_dataset
 
 global_step = 0
@@ -157,7 +157,7 @@ def train_epoch(vae, unet, train_dataloader, accelerator, optimizer, lr_schedule
     unet.train()
     root_path = os.path.join(config["output_dir"], config["trials"])
     checkpoint = (epoch % config["checkpoint_epoch"] == 0)
-
+    train_loss = []
     for step, batch in enumerate(train_dataloader):
         optimizer.zero_grad()
         with accelerator.accumulate(unet):
@@ -189,10 +189,25 @@ def train_epoch(vae, unet, train_dataloader, accelerator, optimizer, lr_schedule
                 lr_scheduler(global_step)
             
             if accelerator.is_main_process:
-                wandb.log({"train/loss_per_step": loss.item()}, step=global_step)
-
+                wandb.log({"loss_per_step": loss.item()})
+            
+            train_loss.append(loss.detach().item())
+            
     if checkpoint and accelerator.is_main_process:
         unwrapped_model = accelerator.unwrap_model(unet)
+        num_samples = config["num_samples"]
+        cond = encoder_hidden_states[:4, :, :]
+        pred_latents = produce_latents(
+            config, encoder_hidden_states=cond, unet=unwrapped_model, seed=config['seed']
+        )
+        pred_imgs = decode_img_latents(pred_latents, config, vae=vae)
+        save_path = os.path.join(root_path, "images")
+        os.makedirs(save_path, exist_ok=True)
+        img_path = os.path.join(save_path, f"image-grid_epoch-{epoch}_step-{accelerator.num_processes * global_step}.png")
+        grid_image = make_image_grid(pred_imgs, grid_size=(2, 2), padding=10, bg_color=(255, 255, 255))
+        grid_image.save(img_path)
+        wandb.log({f"train/generated_image_epoch-{epoch}": wandb.Image(grid_image, caption=f"epoch {epoch} step {global_step}"), "epoch": epoch})
+    
         checkpoint_data = {
             "epoch": epoch + 1,
             "global_step": global_step,
@@ -203,6 +218,8 @@ def train_epoch(vae, unet, train_dataloader, accelerator, optimizer, lr_schedule
         ckpt_path = os.path.join(root_path, "model", f"{config['name']}_epoch{epoch+1}_step{global_step}.pt")
         torch.save(checkpoint_data, ckpt_path)
         print(f"Checkpoint saved at {ckpt_path}")
+    
+    return sum(train_loss) / len(train_loss)
 
 def eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator):
     unet.eval()
@@ -222,7 +239,7 @@ def eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator):
             target = noise if noise_scheduler.config.prediction_type == "epsilon" else noise_scheduler.get_velocity(latents, noise, timesteps)
 
             loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-            val_loss.append(loss.item())
+            val_loss.append(loss.detach().item())
     return sum(val_loss) / len(val_loss)
 
 def objective(config):
@@ -231,11 +248,12 @@ def objective(config):
     progress_bar = tqdm(range(max_train_steps), desc="Training Progress")
     start_epoch = config.get("resume_epoch", 0)
     for epoch in range(start_epoch, config["num_train_epochs"]):
-        train_epoch(vae, unet, train_dataloader, accelerator, optimizer, lr_scheduler,
-                    noise_scheduler, config, epoch, progress_bar)
-
         if accelerator.is_main_process:
             wandb.log({"epoch": epoch})
+        train_loss = train_epoch(vae, unet, train_dataloader, accelerator, optimizer, lr_scheduler,
+                    noise_scheduler, config, epoch, progress_bar)
+        if accelerator.is_main_process:
+                wandb.log({"train/loss_per_epoch": train_loss, "epoch": epoch})
 
         if config.get("validation", False) and (epoch % 10 == 0):
             val_loss = eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator)

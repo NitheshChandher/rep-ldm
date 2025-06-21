@@ -1,0 +1,41 @@
+#=== Directories ===#
+output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
+data_dir: /scratch/local/rep-ldm/clip/data/imagenet100                    
+rep_dir: /scratch/local/rep-ldm/clip/rep/imagenet100-clip              
+pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
+
+#=== Data Setup ===# 
+seed: 42                                                                            
+resolution: 256                                                            
+batch_size: 16                                            
+dataset: imagenet-100                                            
+trials: clip-ldm-imagenet-100                              
+
+#=== Pre-trained Encoder Config ===#
+encoder_name: KL                                             
+channels: 4                                               
+rep_encoder: test                                     
+embed_dim: 768
+
+#=== Training U-Net ===#
+lr: 0.00005                                                                        
+beta_1: 0.9                                                           
+beta_2:  0.999                                                
+weight_decay: 0.001                                           
+lr_scheduler: lambdalinear                                       
+num_train_epochs: 125                                      
+gradient_accumulation_steps: 1                             
+name: clip-ldm-unet-imagenet-100                                 
+checkpoint_epoch: 25                                                                            
+prev_step: 0
+validation: True
+train_from_scratch: True
+
+#=== Sampling U-Net ===#
+method: clip-ldm
+scheduler: ddpm
+noise_strength: 0.0
+guidance_scale: 6
+num_samples: 8
+infsteps: 100 
+sampling: seed  

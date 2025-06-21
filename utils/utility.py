@@ -97,3 +97,38 @@ def produce_latents(config, unet, seed=42, encoder_hidden_states=None, noise_sch
             progress_bar.update(1)
     del unet, scheduler  
     return latents
+
+def make_image_grid(images, grid_size=(2, 2), padding=10, bg_color=(255, 255, 255)):
+    """
+    Arrange 4 PIL images into a 2x2 grid.
+    
+    Args:
+        images (list): List of 4 PIL.Image objects.
+        grid_size (tuple): The grid layout (rows, cols), default is (2, 2).
+        padding (int): Padding between images in pixels.
+        bg_color (tuple): Background color (R, G, B).
+        
+    Returns:
+        PIL.Image: A new image containing the grid.
+    """
+    assert len(images) == 4, "You must provide exactly 4 images."
+
+    widths, heights = zip(*(img.size for img in images))
+    max_width, max_height = max(widths), max(heights)
+    
+    resized_images = [img.resize((max_width, max_height)) for img in images]
+    
+    grid_rows, grid_cols = grid_size
+    total_width = grid_cols * max_width + (grid_cols - 1) * padding
+    total_height = grid_rows * max_height + (grid_rows - 1) * padding
+
+    grid_image = Image.new('RGB', (total_width, total_height), color=bg_color)
+
+    for idx, img in enumerate(resized_images):
+        row = idx // grid_cols
+        col = idx % grid_cols
+        x = col * (max_width + padding)
+        y = row * (max_height + padding)
+        grid_image.paste(img, (x, y))
+
+    return grid_image

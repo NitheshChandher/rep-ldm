@@ -10,9 +10,9 @@
 
 # Define paths
 export ZIP_DATA=/proj/dcdl/users/gabei62/rep-ldm/data/imagenet100.zip
-export ZIP_REP=/proj/dcdl/users/gabei62/rep-ldm/rep/imagenet100-dinov2.zip
-export SCRATCH_DIR=/scratch/local/rep-ldm/data
-export SCRATCH_REP_DIR=/scratch/local/rep-ldm/rep
+export ZIP_REP=/proj/dcdl/users/gabei62/rep-ldm/rep/imagenet100-clip.zip
+export SCRATCH_DIR=/scratch/local/rep-ldm/clip/data
+export SCRATCH_REP_DIR=/scratch/local/rep-ldm/clip/rep
 
 # Create scratch directories
 mkdir -p $SCRATCH_DIR $SCRATCH_REP_DIR
@@ -31,4 +31,4 @@ conda activate di
 cd /proj/dcdl/users/gabei62/rep-ldm
 
 # Start training
-accelerate launch rep-ldm.py --config="configs/imagenet-100/dino.yaml"
+accelerate launch rep-ldm.py --config="configs/imagenet-100/clip.yaml"
