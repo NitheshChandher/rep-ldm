@@ -8,7 +8,7 @@ from PIL import Image
 import numpy as np
 import random
 
-def seed_dataset(args):
+def syn_dataset(args):
     """
     Generate images using a trained dino-ldm model and save them to disk.
     """

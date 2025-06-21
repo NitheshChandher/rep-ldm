@@ -8,7 +8,7 @@ from transformers import ViTModel
 from torch import autocast
 from tqdm.auto import tqdm
 from PIL import Image
-from eval.seed_dataset import seed_dataset
+from eval.syn_dataset import syn_dataset
 from eval.perturbe_dataset import perturbe_dataset
 import numpy as np
 import random
@@ -98,7 +98,7 @@ def parse_args():
     parser.add_argument(
         "--method",
         type=str,
-        default="seed-dataset",
+        default="syn-dataset",
         required=True,
         help="Choose among perturbe-dataset or interpolate-dataset",
     )
@@ -196,10 +196,10 @@ def main():
     args = parse_args()
     if args.model not in ['dino-ldm', 'clip-ldm', 'diffae', 'baseline']:
         raise ValueError("Invalid method! Choose among dino-ldm, clip-ldm, diffae, or baseline")
-    if args.method not in ['seed-dataset', 'perturbate-dataset', 'interpolate-dataset']:
+    if args.method not in ['syn-dataset', 'perturbate-dataset', 'interpolate-dataset']:
         raise ValueError("Invalid method! Choose among perturbate-dataset or interpolate-dataset")
-    if args.dataset not in ['ffhq', 'celeba', 'subset-imagenet']:
-        raise ValueError("Invalid dataset! Choose among ffhq, celeba, or subset-imagenet")
+    if args.dataset not in ['ffhq', 'celeba', 'celeba-hq', 'imagenet-100']:
+        raise ValueError("Invalid dataset! Choose among ffhq, celeba, 'celeba-hq', or imagenet-100")
     
     gen_path = os.path.join(args.save_path, args.model, args.dataset)
     if not os.path.exists(gen_path):
@@ -208,8 +208,8 @@ def main():
     else:
         print(f'{args.dataset} folder already exists in {args.save_path}/{args.model}')
     
-    if args.method == 'seed-dataset':
-        seed_dataset(args)
+    if args.method == 'syn-dataset':
+        syn_dataset(args)
         gen_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
         metric_dict = torch_metrics(args, gen_path)
         print("Metric Info:", metric_dict)
@@ -226,7 +226,7 @@ def main():
     elif args.method == 'interpolate-dataset':
         raise NotImplementedError("Interpolate dataset functionality is not implemented yet.")
     else:
-        raise ValueError("Invalid method! Choose among seed-dataset or interpolate-dataset")
+        raise ValueError("Invalid method! Choose among syn-dataset or interpolate-dataset")
     
     
 if __name__ == "__main__":
