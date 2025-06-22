@@ -4,7 +4,7 @@ which itself is based on the original diffusion autoencoder implementation (http
 
 """
 import torch.nn as nn
-from .network_blocks import AttentionBlock, Downsample, ResnetBlock
+from .blocks import AttentionBlock, Downsample, ResnetBlock
 
 
 class SemanticEncoder(nn.Module):
@@ -15,18 +15,18 @@ class SemanticEncoder(nn.Module):
         Args (dict): A dict of config.
         """
         super().__init__()
-        self.network_cfg = cfg['model']['network']['encoder']
-        self.image_size = self.network_cfg['image_size']
-        self.in_chans = self.network_cfg['in_channels']
-        self.out_chans = self.network_cfg['out_channels']
-        self.model_chans = self.network_cfg['model_channels']
-        self.emb_chans = self.network_cfg['emb_channels']
-        self.chan_mults = self.network_cfg['channel_multipliers']
-        self.n_res_blocks = self.network_cfg['num_resnet_blocks']
-        self.res_dropout = self.network_cfg['resnet_dropout']
-        self.attn_resolution = self.network_cfg['attn_resolution']
-        self.use_conv_resample = self.network_cfg['use_conv_resample']
-        self.groups = self.network_cfg['num_groups']
+        self.cfg = cfg  
+        self.image_size = self.cfg['image_size']
+        self.in_chans = self.cfg['in_channels']
+        self.out_chans = self.cfg['out_channels']
+        self.model_chans = self.cfg['model_channels']
+        self.emb_chans = self.cfg['emb_channels']
+        self.chan_mults = self.cfg['channel_multipliers']
+        self.n_res_blocks = self.cfg['num_resnet_blocks']
+        self.res_dropout = self.cfg['resnet_dropout']
+        self.attn_resolution = self.cfg['attn_resolution']
+        self.use_conv_resample = self.cfg['use_conv_resample']
+        self.groups = self.cfg['num_groups']
 
         self.time_emb_chans = self.emb_chans
         self.style_emb_chans = self.emb_chans

@@ -89,7 +89,7 @@ def produce_latents(config, unet, seed=42, encoder_hidden_states=None, noise_sch
         for i, t in enumerate(scheduler.timesteps):
             # UNet expects (B, C, H, W), timestep, and encoder_hidden_states
             with torch.no_grad():
-                if config["method"] == 'dino-ldm' or config["method"] == 'clip-ldm':
+                if config["method"] == 'dino-ldm' or config["method"] == 'clip-ldm' or config["method"] == 'diffae':
                     noise_pred = unet(latents, t, encoder_hidden_states)['sample']    
                 else:    
                     noise_pred = unet(latents, t)['sample']
