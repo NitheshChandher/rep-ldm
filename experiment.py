@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 from PIL import Image
 from eval.syn_dataset import syn_dataset
 from eval.perturbe_dataset import perturbe_dataset
+from eval.interpolate_dataset import interpolate_dataset
 import numpy as np
 import random
 import torch_fidelity
@@ -216,15 +217,19 @@ def main():
 
     elif args.method == 'perturbate-dataset':
         perturbe_dataset(args)
-        save_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+        save_path = os.path.join(args.save_path, args.model, args.dataset, args.method)
         alpha = np.linspace(0, 1, 5)
         for lamda in alpha:
             gen_path = os.path.join(save_path, str(lamda))
             metric_dict = torch_metrics(args, gen_path)
             print("Metric Info:", metric_dict)
-
+    
     elif args.method == 'interpolate-dataset':
-        raise NotImplementedError("Interpolate dataset functionality is not implemented yet.")
+        interpolate_dataset(args)
+        gen_path = os.path.join(args.save_path, args.model, args.dataset, args.method)
+        metric_dict = torch_metrics(args, gen_path)
+        print("Metric Info:", metric_dict)
+
     else:
         raise ValueError("Invalid method! Choose among syn-dataset or interpolate-dataset")
     
