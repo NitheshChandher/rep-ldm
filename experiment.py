@@ -22,7 +22,7 @@ def torch_metrics(args, gen_path, alpha=None):
     dataset = args.dataset
     seed = args.seed
     filename = "results.csv"
-    real_path = args.test_dir
+    real_path = args.eval_dir
 
     # Calculate metrics
     metrics_dict = torch_fidelity.calculate_metrics(
@@ -113,7 +113,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--test_dir",
+        "--eval_dir",
         type=str,
         default='./data/ffhq512/test',
         required=True,
@@ -123,8 +123,8 @@ def parse_args():
     parser.add_argument(
         "--rep_dir",
         type=str,
-        default='./rep/ffhq512-dinov2',
-        required=True,
+        default=None,
+        required=False,
         help="Path to the representation files",
     )
 

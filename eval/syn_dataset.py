@@ -2,6 +2,8 @@ import os
 import torch
 from dataset.dataloader import load_and_prepare_dataset
 from diffusers import DDPMScheduler, DDIMScheduler, AutoencoderKL
+from dataset.custom import ImageDataset
+from torch.utils.data import DataLoader
 from torch import autocast
 from tqdm.auto import tqdm
 from PIL import Image
@@ -38,11 +40,14 @@ def syn_dataset(args):
             
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae", revision=None)
     vae.requires_grad_(False)
-
-    _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=None, rep_dir=args.rep_dir)
  
     unet.eval()
-    if args.model == 'dino-ldm' or args.model == 'clip-ldm':
+    
+    if args.model == 'dino-ldm' or args.model == 'clip-ldm' or args.model == 'diffae':
+        if args.rep_dir is None:
+            raise ValueError("rep_dir must be provided for dino-ldm or clip-ldm or diffae models.")
+
+        _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=None, rep_dir=args.rep_dir)
         for step, batch in enumerate(dataloader):
             latents = torch.randn((args.bs, 4, args.height // 8, args.width // 8))
             latents = latents.to(device)
@@ -73,11 +78,12 @@ def syn_dataset(args):
             torch.cuda.empty_cache()
             print(f"Batch {step+1}/{len(dataloader)} is Saved!")    
     
-    elif args.model == 'diffae':
-        raise NotImplementedError("DiffAE model is not supported yet.")
-    
-    else:
-        for step in range(0,len(dataloader)):
+    elif args.model == 'baseline':
+        Dataset = ImageDataset(image_dir=args.eval_dir, rep_dir=None, transform=None)
+        Dataloader = DataLoader(Dataset, batch_size=args.bs, shuffle=False, num_workers=0)
+        size = len(Dataloader)
+        del Dataloader, Dataset
+        for step in range(0,size):
             latents = torch.randn((args.bs, 4, args.height // 8, args.width // 8))
             latents = latents.to(device)
             scheduler.set_timesteps(args.num_inference_steps)
@@ -105,3 +111,6 @@ def syn_dataset(args):
             del latents, decoder_output, imgs, pil_images, noise_pred,
             torch.cuda.empty_cache()
             print(f"Batch {step+1}/{len(dataloader)} is Saved!")
+
+    else:
+        raise ValueError(f"Model {args.model} is not supported. Please choose from ['dino-ldm', 'clip-ldm', 'diffae', 'baseline'].")

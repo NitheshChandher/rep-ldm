@@ -38,11 +38,13 @@ def interpolate_dataset(args):
             
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae", revision=None)
     vae.requires_grad_(False)
-
-    _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=None, rep_dir=args.rep_dir)
  
     unet.eval()
-    if args.model == 'dino-ldm' or args.model == 'clip-ldm':
+    if args.model == 'dino-ldm' or args.model == 'clip-ldm' or args.model == 'diffae':
+        if args.rep_dir is None:
+            raise ValueError("rep_dir must be provided for dino-ldm or clip-ldm or diffae models.")
+
+        _,dataloader = load_and_prepare_dataset(dataset_name=args.dataset, batch_size=args.bs, img_size=(args.height, args.width),data_dir=None, rep_dir=args.rep_dir)
         first_element = None
         prev_element = None
         all_interpolated = []
@@ -95,9 +97,6 @@ def interpolate_dataset(args):
             del latents, encoder_hidden_states, decoder_output, imgs, pil_images, noise_pred, batch
             torch.cuda.empty_cache()
             print(f"Batch {step+1}/{len(dataloader)} is Saved!")    
-    
-    elif args.model == 'diffae':
-        raise NotImplementedError("DiffAE model is not supported yet.")
     
     elif args.model == 'baseline':
         raise NotImplementedError("Baseline model is not supported.")
