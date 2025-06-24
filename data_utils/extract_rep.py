@@ -64,7 +64,13 @@ default_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-def extract_representations(image_folder, output_folder, model_name, batch_size=16):
+
+def extract_representations(args):
+    image_folder= args.data 
+    output_folder= args.output
+    model_name= args.model
+    batch_size= args.batch_size
+
     os.makedirs(output_folder, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -73,28 +79,46 @@ def extract_representations(image_folder, output_folder, model_name, batch_size=
         model = load_dino_model()
         model.to(device)
         processor = None
-        is_clip = False
+
     elif model_name == "PE":
         model = vit_small(pretrained=True, progress=True)
         model.to(device)
         processor = None
-        is_clip = False
+
     elif model_name == "CLIP":
         model, processor = load_clip_model()
         model.to(device)
-        is_clip = True
+
+    elif model_name == "DIFFAE":
+        model = torch.load(args.model_path, map_location=device)
+        model.eval()
+        processor = None
+
     else:
         raise ValueError("Invalid model name. Choose 'DINOv2', 'PE', or 'CLIP'.")
 
     # Load dataset
-    transform = None if is_clip else default_transform
+    if model_name == "CLIP":
+        transform = None
+    elif model_name == "DIFFAE":
+        # Transform for DIFFAE
+        transform= transforms.Compose([
+                        transforms.Resize(args.img_size),
+                        transforms.ToTensor(),        
+                        transforms.Normalize(mean=[0.5], std=[0.5])
+                    ])
+        print(f"Using DIFFAE image size: {args.img_size}, default transform applied!") 
+
+    else:
+        transform = default_transform
+
     dataset = ImageDataset(image_folder, transform=transform)
     collate_fn = collate_pil if is_clip else None
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
     with torch.no_grad():
         for images, img_names in dataloader:
-            if is_clip:
+            if model_name == "CLIP":
                 # Convert tensors to PIL for CLIPProcessor
                 inputs = processor(images=images, return_tensors="pt", padding=True).to(device)
                 vision_outputs = model.vision_model(**inputs)
@@ -113,7 +137,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, required=True, help="Path to the image folder")
     parser.add_argument("--output", type=str, required=True, help="Path to the output folder")
-    parser.add_argument("--model", type=str, default="DINOv2", help="DINOv2, Pathology Encoder (PE), or CLIP")
+    parser.add_argument("--model", type=str, default="DINOv2", help="DINOv2, Pathology Encoder (PE), DIFFAE, or CLIP")
+    parser.add_argument("--model_path", type=str, default=None, help="Path to the model weights if not using default pretrained models")
+    parser.add_argument("--img_size", type=int, default=256, help="Image size for DIFFAE")
     parser.add_argument("--batch_size", type=int, default=16)
     args = parser.parse_args()
 
@@ -126,7 +152,7 @@ def main():
         print(f"Creating a directory at {args.output}!")
         os.makedirs(args.output, exist_ok=True)
 
-    extract_representations(args.data, args.output, args.model, args.batch_size)
+    extract_representations(args)
 
 if __name__ == "__main__":
     main()
