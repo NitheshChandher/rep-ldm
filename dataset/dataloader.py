@@ -106,6 +106,16 @@ def load_and_prepare_dataset(dataset_name, batch_size=16, img_size=(256, 256), d
             val_dataset = RepresentationDataset(rep_dir=rep_dir)
             train_dataloader = None
             val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+        
+        elif dataset_name == "imagenet-100":
+            rep_train_dir = os.path.join(rep_dir, "train")
+            rep_val_dir = os.path.join(rep_dir, "val")
+
+            train_dataset = RepresentationDataset(rep_dir=rep_train_dir)
+            val_dataset = RepresentationDataset(rep_dir=rep_val_dir)
+            train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
+            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+            
         else:
             raise ValueError("Representations Not Available! Incorrect input config for representation directory")
 
