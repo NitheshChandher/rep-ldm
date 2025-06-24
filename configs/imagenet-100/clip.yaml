@@ -9,7 +9,7 @@ seed: 42
 resolution: 256                                                            
 batch_size: 16                                            
 dataset: imagenet-100                                            
-trials: clip-ldm-imagenet-100                              
+trials: clip-ldm-imagenet-100                             
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
@@ -25,11 +25,12 @@ weight_decay: 0.001
 lr_scheduler: lambdalinear                                       
 num_train_epochs: 125                                      
 gradient_accumulation_steps: 1                             
-name: clip-ldm-unet-imagenet-100                                 
+name: clip-ldm-unet-imagenet-100                                
 checkpoint_epoch: 25                                                                            
 prev_step: 0
 validation: True
-train_from_scratch: True
+train_from_scratch: False
+resume_path: /proj/dcdl/users/gabei62/rep-ldm/output/clip-ldm-imagenet-100/model/clip-ldm-unet-imagenet-100_epoch101_step205232.pt
 
 #=== Sampling U-Net ===#
 method: clip-ldm

@@ -29,7 +29,8 @@ name: dinov2-ldm-unet-imagenet-100
 checkpoint_epoch: 25                                                                            
 prev_step: 0
 validation: True
-train_from_scratch: True
+train_from_scratch: False
+resume_path: /proj/dcdl/users/gabei62/rep-ldm/output/dinov2-ldm-imagenet-100/model/dinov2-ldm-unet-imagenet-100_epoch101_step205232.pt
 
 #=== Sampling U-Net ===#
 method: dino-ldm

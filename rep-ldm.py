@@ -76,13 +76,11 @@ def setup(config):
         )
     else:
         raise ValueError("Invalid Autoencoder type specified.")
-
+    
     resume_path = None
-    checkpoint_files = [f for f in os.listdir(model_dir) if f.endswith(".pt")]
-    if checkpoint_files and not config.get('train_from_scratch', False):
-        latest_ckpt = sorted(checkpoint_files)[-1]
-        resume_path = os.path.join(model_dir, latest_ckpt)
-        print(f"Resuming training from checkpoint: {resume_path}")
+    if not config.get('train_from_scratch', False):
+        resume_path = config.get('resume_path')
+        print(f"Resuming from {resume_path}")
 
     unet = UNet2DConditionModel(
         sample_size=int(config["resolution"]) // 8,
@@ -118,7 +116,7 @@ def setup(config):
         raise ValueError(f"Unknown lr_scheduler {config['lr_scheduler']}")
 
     # Load checkpoint if available
-    if resume_path:
+    if resume_path is not None and os.path.exists(resume_path):
         checkpoint = torch.load(resume_path, map_location="cpu")
         unet.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -247,6 +245,13 @@ def objective(config):
      lr_scheduler, noise_scheduler, max_train_steps) = setup(config)
     progress_bar = tqdm(range(max_train_steps), desc="Training Progress")
     start_epoch = config.get("resume_epoch", 0)
+    final_model_path = os.path.join(
+        config["output_dir"],
+        config["trials"],
+        "model",
+        f"{config['name']}_final_full_model.pth"
+    )
+
     for epoch in range(start_epoch, config["num_train_epochs"]):
         if accelerator.is_main_process:
             wandb.log({"epoch": epoch})
@@ -262,13 +267,7 @@ def objective(config):
 
     if accelerator.is_main_process:
         wandb.finish()
-        final_model_path = os.path.join(
-        config["output_dir"],
-        config["trials"],
-        "model",
-        f"{config['name']}_final_full_model.pth"
-    )
-
+        
     unwrapped_model = accelerator.unwrap_model(unet)
     torch.save(unwrapped_model, final_model_path)
     print(f"✅ Full model saved to: {final_model_path}")
