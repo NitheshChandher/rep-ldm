@@ -16,7 +16,7 @@ import transformers
 import diffusers
 import yaml
 import wandb
-from utils.utility import decode_img_latents, produce_latents
+from utils.utility import decode_img_latents, produce_latents, make_image_grid
 from dataset.dataloader import load_and_prepare_dataset
 
 global_step = 0
@@ -84,6 +84,11 @@ def setup(config):
     else:
         raise ValueError("Invalid Autoencoder type specified.")
 
+    resume_path = None
+    if not config.get('train_from_scratch', False):
+        resume_path = config.get('resume_path')
+        print(f"Resuming from {resume_path}")
+
     # Load or initialize UNet
     if config['train_from_scratch']:
         unet = UNet2DModel(
@@ -112,18 +117,6 @@ def setup(config):
         unet = torch.load(model_path, weights_only=False)
         print(f"Resuming training from checkpoint: {model_path}")
 
-    vae.requires_grad_(False)
-    unet.requires_grad_(True)
-
-    # Watch the model with wandb for gradients and parameters
-    if accelerator.is_main_process:
-        wandb.watch(unet, log_freq=100)
-
-    # Training steps and optimizer
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / config['gradient_accumulation_steps'])
-    max_train_steps = config['num_train_epochs'] * num_update_steps_per_epoch
-
     optimizer = torch.optim.AdamW(
         unet.parameters(),
         lr=config["lr"],
@@ -151,25 +144,38 @@ def setup(config):
     else:
         raise ValueError(f"Unknown lr_scheduler {config['lr_scheduler']}")
 
+    if resume_path is not None and os.path.exists(resume_path):
+        checkpoint = torch.load(resume_path, map_location="cpu")
+        unet.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if hasattr(lr_scheduler, "load_state_dict") and "scheduler_state_dict" in checkpoint:
+            lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        config["resume_epoch"] = checkpoint.get("epoch", 0)
+        config["prev_step"] = checkpoint.get("global_step", 0)
+    else:
+        config["resume_epoch"] = 0
+        config["prev_step"] = 0
+
+    vae.requires_grad_(False)
+    unet.requires_grad_(True)
+
+    # Watch the model with wandb for gradients and parameters
+    if accelerator.is_main_process:
+        wandb.watch(unet, log_freq=100)
+
     # Prepare for distributed training
     unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         unet, optimizer, train_dataloader, lr_scheduler
     )
-    vae.to(accelerator.device, dtype=torch.float32)
-    unet.to(accelerator.device, dtype=torch.float32)
+    vae.to(accelerator.device)
 
     # Recalculate steps if dataloader size changed
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / config['gradient_accumulation_steps'])
-    max_train_steps = config['num_train_epochs'] * num_update_steps_per_epoch
-    config["num_train_epochs"] = math.ceil(max_train_steps / num_update_steps_per_epoch)
-
-    print(f"Total batch size: {config['batch_size'] * accelerator.num_processes * config['gradient_accumulation_steps']}")
-    print(f"Gradient accumulation steps: {config['gradient_accumulation_steps']}")
-    print(f"Number of processes: {accelerator.num_processes}")
-    print(f"Number of training steps: {max_train_steps}")
-    print(f"Number of epochs: {config['num_train_epochs']}")
-    print(f"Number of update steps per epoch: {num_update_steps_per_epoch}")
+    if config.get('train_from_scratch', True): 
+        max_train_steps = config['num_train_epochs'] * num_update_steps_per_epoch
+    else:
+        max_train_steps = (config['num_train_epochs'] - config["resume_epoch"]) * num_update_steps_per_epoch + config["prev_step"]
 
     return (unet, vae, accelerator, optimizer, train_dataloader, val_dataloader,
             lr_scheduler, noise_scheduler, max_train_steps)
@@ -183,19 +189,14 @@ def train_epoch(
     """
     global global_step
     unet.train()
-    prev_step = 0 if config["train_from_scratch"] else int(config.get("prev_step", 0))
-    train_loss = []
-    dtype = torch.float32
     root_path = os.path.join(config["output_dir"], config["trials"])
-    if epoch % config["checkpoint_epoch"] == 0:
-        checkpoint = True
-    else:
-        checkpoint = False
+    checkpoint = (epoch % config["checkpoint_epoch"] == 0)
+    train_loss = []
 
     for step, batch in enumerate(train_dataloader):
         optimizer.zero_grad()
         with accelerator.accumulate(unet):
-            latents = vae.encode(batch[0].to(accelerator.device, dtype=dtype)).latent_dist.sample().detach()
+            latents = vae.encode(batch[0].to(accelerator.device)).latent_dist.sample().detach()
             latents = latents * 0.18215
             noise = torch.randn_like(latents)
             bsz = latents.shape[0]
@@ -214,20 +215,22 @@ def train_epoch(
 
             loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
             accelerator.backward(loss)
+
             if accelerator.sync_gradients:
                 accelerator.clip_grad_norm_(unet.parameters(), 1.0)
-                progress_bar.update(1)
+                optimizer.step()
                 global_step += 1
+                progress_bar.update(1)
+                progress_bar.set_description(f"Epoch {epoch + 1} Step {step + 1}/{len(train_dataloader)} Loss: {loss.item():.4f}")
 
-            optimizer.step()
             if config["lr_scheduler"] == "constant":
                 lr_scheduler.step()
             else:
                 lr_scheduler(global_step)
-            logs = {"train/loss_per_step": loss.detach().item()}
-            progress_bar.set_postfix(**logs)
+
             if accelerator.is_main_process:
-                wandb.log(logs, step=global_step, commit=False)
+                wandb.log({"loss_per_step": loss.item()})
+            
             train_loss.append(loss.detach().item())
 
     # Optionally log checkpoint info
@@ -239,30 +242,33 @@ def train_epoch(
         pred_imgs = decode_img_latents(pred_latents, config, vae=vae)
         save_path = os.path.join(root_path, "images")
         os.makedirs(save_path, exist_ok=True)
-        for idx, pil_img in enumerate(pred_imgs):
-            img_path = os.path.join(save_path, f"image_{idx}_epoch-{epoch}_step-{accelerator.num_processes * global_step + prev_step}.png")
-            pil_img.save(img_path)
-            wandb.log({f"train/generated_image_{idx}": wandb.Image(pil_img, caption=f"epoch {epoch} step {global_step}"), "epoch": epoch})
-            break
+        img_path = os.path.join(save_path, f"image-grid_epoch-{epoch}_step-{accelerator.num_processes * global_step}.png")
+        grid_image = make_image_grid(pred_imgs, grid_size=(2, 2), padding=10, bg_color=(255, 255, 255))
+        grid_image.save(img_path)
+        wandb.log({f"train/generated_image_epoch-{epoch}": wandb.Image(grid_image, caption=f"epoch {epoch} step {global_step}"), "epoch": epoch})
+    
+        checkpoint_data = {
+            "epoch": epoch + 1,
+            "global_step": global_step,
+            "model_state_dict": unwrapped_model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": lr_scheduler.state_dict() if hasattr(lr_scheduler, "state_dict") else None
+        }
+        ckpt_path = os.path.join(root_path, "model", f"{config['name']}_epoch{epoch+1}_step{global_step}.pt")
+        torch.save(checkpoint_data, ckpt_path)
+        print(f"Checkpoint saved at {ckpt_path}")
 
-        checkpoint_path = os.path.join(root_path, "model")
-        os.makedirs(checkpoint_path, exist_ok=True)
-        checkpoint_path = os.path.join(checkpoint_path, f"{config['name']}_epoch-{epoch}_step-{accelerator.num_processes * global_step + prev_step}.pth")
-        torch.save(unwrapped_model, checkpoint_path)
-        del unwrapped_model
-
-    return train_loss
+    return sum(train_loss) / len(train_loss)
 
 def eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator):
     """
     Evaluate the model for one epoch.
     """
-    dtype = torch.float32
     unet.eval()
     val_loss = []
     for _, batch in enumerate(val_dataloader):
         with torch.no_grad():
-            latents = vae.encode(batch[0].to(accelerator.device, dtype=dtype)).latent_dist.sample().detach()
+            latents = vae.encode(batch[0].to(accelerator.device)).latent_dist.sample().detach()
             latents = latents * 0.18215
             noise = torch.randn_like(latents)
             bsz = latents.shape[0]
@@ -281,7 +287,7 @@ def eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator):
 
             loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
             val_loss.append(loss.detach().item())
-    return val_loss
+    return sum(val_loss) / len(val_loss)
 
 def objective(config):
     """
@@ -291,30 +297,34 @@ def objective(config):
      lr_scheduler, noise_scheduler, max_train_steps) = setup(config)
 
     progress_bar = tqdm(range(max_train_steps), desc="Training Progress")
+    start_epoch = config.get("resume_epoch", 0)
+    final_model_path = os.path.join(
+        config["output_dir"],
+        config["trials"],
+        "model",
+        f"{config['name']}_final_full_model.pth"
+    )
 
-    for epoch in range(config["num_train_epochs"]):
+    for epoch in range(start_epoch, config["num_train_epochs"]):
+        if accelerator.is_main_process:
+            wandb.log({"epoch": epoch})
         train_loss = train_epoch(
             vae, unet, train_dataloader, accelerator, optimizer, lr_scheduler,
             noise_scheduler, progress_bar, config, epoch=epoch
         )
         if accelerator.is_main_process:
-            wandb.log({
-                    "train/loss_per_epoch": sum(train_loss) / len(train_loss),
-                    "epoch": epoch
-                })
+            wandb.log({"train/loss_per_epoch": train_loss, "epoch": epoch})
     
-        if config["validation"] is True:
-            if epoch % 10 == 0:
-                val_loss = eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator)
-                if accelerator.is_main_process:
-                    wandb.log({
-                        "val/loss_per_epoch": sum(val_loss) / len(val_loss),
-                        "epoch": epoch
-                        })
+        if config.get("validation", False) and (epoch % 10 == 0):
+            val_loss = eval_epoch(vae, unet, val_dataloader, noise_scheduler, accelerator)
+            if accelerator.is_main_process:
+                wandb.log({"val/loss_per_epoch": val_loss, "epoch": epoch})
             
     if accelerator.is_main_process:
         wandb.finish()
-    print("Training complete.")
+    unwrapped_model = accelerator.unwrap_model(unet)
+    torch.save(unwrapped_model, final_model_path)
+    print(f"✅ Full model saved to: {final_model_path}")
 
 def main():
     """

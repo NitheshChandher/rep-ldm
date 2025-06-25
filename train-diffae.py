@@ -4,6 +4,7 @@ import argparse
 import pathlib
 import torch
 import torch.nn.functional as F
+from accelerate.utils import DistributedDataParallelKwargs
 from torch.nn.parallel import DistributedDataParallel as DDP
 from accelerate import Accelerator
 from accelerate.utils import set_seed
@@ -18,7 +19,7 @@ import wandb
 from diffae.encoder import SemanticEncoder
 from utils.utility import decode_img_latents, produce_latents, make_image_grid
 from dataset.dataloader import load_and_prepare_dataset
-
+from accelerate import Accelerator
 global_step = 0
 
 def setup(config):
@@ -80,11 +81,9 @@ def setup(config):
         raise ValueError("Invalid Autoencoder type specified.")
 
     resume_path = None
-    checkpoint_files = [f for f in os.listdir(model_dir) if f.endswith(".pt")]
-    if checkpoint_files and not config.get('train_from_scratch', False):
-        latest_ckpt = sorted(checkpoint_files)[-1]
-        resume_path = os.path.join(model_dir, latest_ckpt)
-        print(f"Resuming training from checkpoint: {resume_path}")
+    if not config.get('train_from_scratch', False):
+        resume_path = config.get('resume_path')
+        print(f"Resuming from {resume_path}")
 
     unet = UNet2DConditionModel(
         sample_size=int(config["resolution"]) // 8,
@@ -139,6 +138,7 @@ def setup(config):
     if resume_path:
         checkpoint = torch.load(resume_path, map_location="cpu")
         unet.load_state_dict(checkpoint["model_state_dict"])
+        diffae_encoder.load_state_dict(checkpoint["encoder_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         if hasattr(lr_scheduler, "load_state_dict") and "scheduler_state_dict" in checkpoint:
             lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
@@ -155,13 +155,29 @@ def setup(config):
     if accelerator.is_main_process:
         wandb.watch(unet, log_freq=100)
 
+    accelerator = Accelerator(
+    kwargs_handlers=[DistributedDataParallelKwargs(find_unused_parameters=True)]
+    )
+    
+    diffae_encoder.to(accelerator.device)
+    vae.to(accelerator.device)
+
     unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         unet, optimizer, train_dataloader, lr_scheduler
     )
 
-    diffae_encoder.to(accelerator.device)
-    diffae_encoder = DDP(diffae_encoder, device_ids=[accelerator.device.index], find_unused_parameters=True)
-    vae.to(accelerator.device)
+    # Wrap diffae_encoder manually with DDP
+    
+    #if accelerator.distributed_type == "MULTI_GPU":
+    #    diffae_encoder = DDP(
+    #        diffae_encoder,
+    #        device_ids=[accelerator.device.index],
+    #        output_device=accelerator.device.index,
+    #        find_unused_parameters=True
+    #    )
+
+    #diffae_encoder.to(accelerator.device)
+    #diffae_encoder = DDP(diffae_encoder, device_ids=[accelerator.device.index], find_unused_parameters=True)
 
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / config['gradient_accumulation_steps'])

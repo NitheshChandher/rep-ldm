@@ -56,7 +56,7 @@ def produce_latents(config, unet, seed=42, encoder_hidden_states=None, noise_sch
     """
     torch.manual_seed(seed)
     if encoder_hidden_states is None:
-        batch_size = 1
+        batch_size = 4
     else:
         batch_size = encoder_hidden_states.shape[0]
         
