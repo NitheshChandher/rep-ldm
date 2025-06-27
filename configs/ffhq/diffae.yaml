@@ -37,7 +37,8 @@ name: diffae-unet-ffhq
 checkpoint_epoch: 10                                                                            
 prev_step: 0
 validation: True
-train_from_scratch: True
+train_from_scratch: False
+resume_path: /proj/dcdl/users/gabei62/rep-ldm/output/diffae-ffhq/model/diffae-unet-ffhq_epoch91_step227500.pt
 
 #=== Sampling U-Net ===#
 method: diffae

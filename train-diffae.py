@@ -291,6 +291,12 @@ def objective(config):
      lr_scheduler, noise_scheduler, max_train_steps) = setup(config)
     progress_bar = tqdm(range(max_train_steps), desc="Training Progress")
     start_epoch = config.get("resume_epoch", 0)
+    final_model_path = os.path.join(
+        config["output_dir"],
+        config["trials"],
+        "model",
+        f"{config['name']}_final_full_model.pth"
+    )
     for epoch in range(start_epoch, config["num_train_epochs"]):
         if accelerator.is_main_process:
             wandb.log({"epoch": epoch})
@@ -306,12 +312,6 @@ def objective(config):
 
     if accelerator.is_main_process:
         wandb.finish()
-        final_model_path = os.path.join(
-        config["output_dir"],
-        config["trials"],
-        "model",
-        f"{config['name']}_final_full_model.pth"
-    )
 
     unwrapped_model = accelerator.unwrap_model(unet)
     diffae_encoder = accelerator.unwrap_model(diffae_encoder)

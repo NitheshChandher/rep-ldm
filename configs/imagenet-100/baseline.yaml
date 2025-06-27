@@ -1,14 +1,14 @@
 #=== Directories ===#
 output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
-data_dir: /scratch/local/rep-ldm/imagenet100/imagenet100                                             
+data_dir: /scratch/local/rep-ldm/data/imagenet100                                            
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
 seed: 42                                                                            
-resolution: 512                                                            
-batch_size: 8                                            
-dataset: ffhq                                            
-trials: baseline-ffhq                              
+resolution: 256                                                            
+batch_size: 16                                            
+dataset: imagenet-100                                           
+trials: baseline-imagenet-100                              
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
@@ -20,10 +20,10 @@ beta_1: 0.9
 beta_2:  0.999                                                
 weight_decay: 0.001                                           
 lr_scheduler: lambdalinear                                       
-num_train_epochs: 100                                      
+num_train_epochs: 125                                      
 gradient_accumulation_steps: 1                             
-name: baseline-unet-ffhq                                 
-checkpoint_epoch: 10                                                                            
+name: baseline-unet-imagenet-100                                 
+checkpoint_epoch: 25                                                                            
 prev_step: 0
 validation: True
 train_from_scratch: True
