@@ -6,6 +6,7 @@ from torchvision import transforms
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from timm.models.vision_transformer import VisionTransformer
+from diffae.encoder import SemanticEncoder
 from transformers import CLIPModel, CLIPProcessor
 
 def vit_small(pretrained, progress, **kwargs):
@@ -100,6 +101,7 @@ def extract_representations(args):
     # Load dataset
     if model_name == "CLIP":
         transform = None
+        is_clip = True
     elif model_name == "DIFFAE":
         # Transform for DIFFAE
         transform= transforms.Compose([
@@ -107,10 +109,12 @@ def extract_representations(args):
                         transforms.ToTensor(),        
                         transforms.Normalize(mean=[0.5], std=[0.5])
                     ])
+        is_clip = False
         print(f"Using DIFFAE image size: {args.img_size}, default transform applied!") 
 
     else:
         transform = default_transform
+        is_clip = False
 
     dataset = ImageDataset(image_folder, transform=transform)
     collate_fn = collate_pil if is_clip else None
