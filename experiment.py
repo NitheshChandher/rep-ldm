@@ -211,7 +211,7 @@ def main():
     
     if args.method == 'syn-dataset':
         syn_dataset(args)
-        gen_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+        gen_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.num_inference_steps))
         metric_dict = torch_metrics(args, gen_path)
         print("Metric Info:", metric_dict)
 

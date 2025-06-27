@@ -67,7 +67,7 @@ def interpolate_dataset(args):
                         prev_element = encoder_hidden_states[i]
                         continue
                 all_interpolated.append(interpolated)
-            interpolated_tensor = torch.cat(all_interpolated, dim=0)  # [N, 1, 768]
+            interpolated_tensor = torch.cat(all_interpolated, dim=0).unsqueeze(1)   # [N, 1, 768]
             num_interp = interpolated_tensor.size(0)
             latents = torch.randn((num_interp, 4, args.height // 8, args.width // 8))
             latents = latents.to(device)

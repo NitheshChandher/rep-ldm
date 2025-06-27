@@ -25,7 +25,7 @@ def syn_dataset(args):
     dtype = torch.float32
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    save_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.seed))
+    save_path = os.path.join(args.save_path, args.model, args.dataset, args.method, str(args.num_inference_steps))
 
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
@@ -76,7 +76,9 @@ def syn_dataset(args):
                     
             del latents, encoder_hidden_states, decoder_output, imgs, pil_images, noise_pred, batch
             torch.cuda.empty_cache()
-            print(f"Batch {step+1}/{len(dataloader)} is Saved!")    
+            print(f"Batch {step+1}/{len(dataloader)} is Saved!")
+        del unet, vae, scheduler, dataloader
+        torch.cuda.empty_cache()     
     
     elif args.model == 'baseline':
         Dataset = ImageDataset(image_dir=args.eval_dir, rep_dir=None, transform=None)
@@ -110,7 +112,8 @@ def syn_dataset(args):
                     
             del latents, decoder_output, imgs, pil_images, noise_pred,
             torch.cuda.empty_cache()
-            print(f"Batch {step+1}/{len(dataloader)} is Saved!")
+            print(f"Batch {step+1}/{size} is Saved!")
+        del unet, vae, scheduler
 
     else:
         raise ValueError(f"Model {args.model} is not supported. Please choose from ['dino-ldm', 'clip-ldm', 'diffae', 'baseline'].")
