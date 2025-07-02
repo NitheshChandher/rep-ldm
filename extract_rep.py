@@ -41,7 +41,7 @@ def collate_pil(batch):
 class ImageDataset(Dataset):
     def __init__(self, image_folder, transform=None):
         self.image_folder = image_folder
-        self.image_files = [f for f in os.listdir(image_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        self.image_files = [f for f in os.listdir(image_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
         self.transform = transform
 
     def __len__(self):
@@ -104,11 +104,16 @@ def extract_representations(args):
         is_clip = True
     elif model_name == "DIFFAE":
         # Transform for DIFFAE
-        transform= transforms.Compose([
-                        transforms.Resize(args.img_size),
-                        transforms.ToTensor(),        
-                        transforms.Normalize(mean=[0.5], std=[0.5])
-                    ])
+        transform = transforms.Compose([
+            transforms.Resize((128, 128)),  # Use desired fixed size (H, W)
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5], std=[0.5])
+            ])
+
+        def __getitem__(self, idx):
+            image = Image.open(self.image_paths[idx]).convert("RGB")
+            image = transform(image)
+            return image, self.image_names[idx]
         is_clip = False
         print(f"Using DIFFAE image size: {args.img_size}, default transform applied!") 
 
