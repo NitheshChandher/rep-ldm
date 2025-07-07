@@ -410,3 +410,5 @@ data/*
 output/*
 logs/*
 eval_dataset/*
+rep-data/*
+*.ipynb
