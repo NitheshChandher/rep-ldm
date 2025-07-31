@@ -1,7 +1,7 @@
 #=== Directories ===#
-output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
-data_dir: /scratch/local/rep-ldm/ffhq/images/ffhq512                    
-rep_dir: /scratch/local/rep-ldm/ffhq/representations/ffhq512-clip               
+output_dir: /path/to/output/folder/      
+data_dir: /path/to/data/folder/                  
+rep_dir: /path/to/rep/folder/                
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
@@ -9,7 +9,7 @@ seed: 42
 resolution: 512                                                            
 batch_size: 8                                            
 dataset: ffhq                                            
-trials: clip-ldm-ffhq-nw                              
+trials: clip-ldm-ffhq                              
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
@@ -25,11 +25,12 @@ weight_decay: 0.001
 lr_scheduler: lambdalinear                                       
 num_train_epochs: 100                                      
 gradient_accumulation_steps: 1                             
-name: clip-ldm-unet-ffhq-nw                                 
+name: clip-ldm-unet-ffhq                                 
 checkpoint_epoch: 10                                                                            
 prev_step: 0
 validation: True
 train_from_scratch: True
+resume_path: /path/to/checkpoint/{prev_checkpoint_name}.pt # only used if train_from_scratch is False
 
 #=== Sampling U-Net ===#
 method: dino-ldm

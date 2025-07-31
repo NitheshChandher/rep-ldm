@@ -1,6 +1,6 @@
 #=== Directories ===#
-output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
-data_dir: /scratch/local/rep-ldm/data/imagenet100                                            
+output_dir: /path/to/output/folder/      
+data_dir: /path/to/data/folder/                                            
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
@@ -27,6 +27,7 @@ checkpoint_epoch: 25
 prev_step: 0
 validation: True
 train_from_scratch: True
+resume_path: /path/to/checkpoint/{prev_checkpoint_name}.pt # only used if train_from_scratch is False
 
 #=== Sampling U-Net ===#
 method: baseline

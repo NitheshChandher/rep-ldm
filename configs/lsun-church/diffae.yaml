@@ -1,21 +1,29 @@
 #=== Directories ===#
-output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
-data_dir: /proj/dcdl/users/gabei62/rep-ldm/data/test_data                   
-rep_dir: /proj/dcdl/users/gabei62/rep-ldm/rep/test_rep                
+output_dir: /path/to/output/folder/      
+data_dir: /path/to/data/folder/                                               
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
 seed: 42                                                                            
-resolution: 512                                                            
-batch_size: 8                                            
-dataset: ffhq                                            
-trials: test                            
+resolution: 128                                                            
+batch_size: 16                                          
+dataset: lsun-church                                            
+trials: diffae-lsun-church                             
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
 channels: 4                                               
 rep_encoder: test                                     
-embed_dim: 768
+
+#=== Semantic Encoder ===#
+embed_dim: 512
+enc_channels: 128
+channel_multipliers: [1,1,2,3,4,4]
+num_resnet_blocks: 2
+resnet_dropout: 0.1
+attn_resolution: [16]
+use_conv_resample: True
+num_groups: 32
 
 #=== Training U-Net ===#
 lr: 0.00005                                                                        
@@ -23,17 +31,17 @@ beta_1: 0.9
 beta_2:  0.999                                                
 weight_decay: 0.001                                           
 lr_scheduler: lambdalinear                                       
-num_train_epochs: 1000                                      
+num_train_epochs: 135                                      
 gradient_accumulation_steps: 1                             
-name: test                                
-checkpoint_epoch: 25                                                                            
+name: diffae-unet-lsun-church                                
+checkpoint_epoch: 50                                                                            
 prev_step: 0
 validation: True
-train_from_scratch: False
-resume_path: /proj/dcdl/users/gabei62/rep-ldm/output/clip-ldm-imagenet-100/model/clip-ldm-unet-imagenet-100_epoch101_step205232.pt
+train_from_scratch: True
+resume_path: /path/to/checkpoint/{prev_checkpoint_name}.pt # only used if train_from_scratch is False
 
 #=== Sampling U-Net ===#
-method: dino-ldm
+method: diffae
 scheduler: ddpm
 noise_strength: 0.0
 guidance_scale: 6

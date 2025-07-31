@@ -1,7 +1,6 @@
 #=== Directories ===#
 output_dir: /path/to/output/folder/      
-data_dir: /path/to/data/folder/                  
-rep_dir: /path/to/rep/folder/          
+data_dir: /path/to/data/folder/                             
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
@@ -9,13 +8,22 @@ seed: 42
 resolution: 256                                                            
 batch_size: 16                                            
 dataset: imagenet-100                                            
-trials: dinov2-ldm-imagenet-100                              
+trials: diffae-imagenet-100                              
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
 channels: 4                                               
 rep_encoder: test                                     
-embed_dim: 768
+
+#=== Semantic Encoder ===#
+embed_dim: 512
+enc_channels: 128
+channel_multipliers: [1,1,2,2,4,4,4]
+num_resnet_blocks: 2
+resnet_dropout: 0.1
+attn_resolution: [16]
+use_conv_resample: True
+num_groups: 32
 
 #=== Training U-Net ===#
 lr: 0.00005                                                                        
@@ -25,15 +33,16 @@ weight_decay: 0.001
 lr_scheduler: lambdalinear                                       
 num_train_epochs: 125                                      
 gradient_accumulation_steps: 1                             
-name: dinov2-ldm-unet-imagenet-100                                 
+name: diffae-imagenet-100                                 
 checkpoint_epoch: 25                                                                            
 prev_step: 0
 validation: True
 train_from_scratch: True
 resume_path: /path/to/checkpoint/{prev_checkpoint_name}.pt # only used if train_from_scratch is False
 
+
 #=== Sampling U-Net ===#
-method: dino-ldm
+method: diffae
 scheduler: ddpm
 noise_strength: 0.0
 guidance_scale: 6

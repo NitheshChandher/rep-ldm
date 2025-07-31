@@ -1,15 +1,15 @@
 #=== Directories ===#
 output_dir: /path/to/output/folder/      
 data_dir: /path/to/data/folder/                  
-rep_dir: /path/to/rep/folder/          
+rep_dir: /path/to/rep/folder/             
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
 seed: 42                                                                            
-resolution: 256                                                            
+resolution: 128                                                            
 batch_size: 16                                            
-dataset: imagenet-100                                            
-trials: dinov2-ldm-imagenet-100                              
+dataset: lsun-church                                            
+trials: dinov2-ldm-lsun-church                              
 
 #=== Pre-trained Encoder Config ===#
 encoder_name: KL                                             
@@ -23,10 +23,10 @@ beta_1: 0.9
 beta_2:  0.999                                                
 weight_decay: 0.001                                           
 lr_scheduler: lambdalinear                                       
-num_train_epochs: 125                                      
+num_train_epochs: 135                                      
 gradient_accumulation_steps: 1                             
-name: dinov2-ldm-unet-imagenet-100                                 
-checkpoint_epoch: 25                                                                            
+name: dinov2-ldm-unet-lsun-church                                
+checkpoint_epoch: 50                                                                            
 prev_step: 0
 validation: True
 train_from_scratch: True

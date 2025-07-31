@@ -1,6 +1,6 @@
 #=== Directories ===#
-output_dir: /proj/dcdl/users/gabei62/rep-ldm/output/       
-data_dir: /scratch/local/rep-ldm/ffhq/images/ffhq512                              
+output_dir: /path/to/output/folder/      
+data_dir: /path/to/data/folder/                                
 pretrained_model_name_or_path: CompVis/stable-diffusion-v1-4  
 
 #=== Data Setup ===# 
@@ -37,8 +37,8 @@ name: diffae-unet-ffhq
 checkpoint_epoch: 10                                                                            
 prev_step: 0
 validation: True
-train_from_scratch: False
-resume_path: /proj/dcdl/users/gabei62/rep-ldm/output/diffae-ffhq/model/diffae-unet-ffhq_epoch91_step227500.pt
+train_from_scratch: True
+resume_path: /path/to/checkpoint/{prev_checkpoint_name}.pt # only used if train_from_scratch is False
 
 #=== Sampling U-Net ===#
 method: diffae
