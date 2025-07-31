@@ -23,7 +23,7 @@ class ImageDataset(Dataset):
 
         # Get list of image file paths
         self.image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) 
-                            if f.endswith(('jpg', 'jpeg', 'png','JPG', 'JPEG', 'PNG'))]
+                            if f.endswith(('jpg', 'jpeg', 'png', 'webp', 'JPG', 'JPEG', 'PNG', 'WEBP'))]
 
     def __len__(self):
         return len(self.image_paths)
