@@ -25,7 +25,6 @@ def setup(config):
     log_path = os.path.join(root_path, "logs")
     model_dir = os.path.join(root_path, "model")
     os.makedirs(model_dir, exist_ok=True)
-
     train_dataloader, val_dataloader = load_and_prepare_dataset(
         dataset_name=config["dataset"],
         batch_size=config["batch_size"],

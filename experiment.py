@@ -199,8 +199,8 @@ def main():
         raise ValueError("Invalid method! Choose among dino-ldm, clip-ldm, diffae, or baseline")
     if args.method not in ['syn-dataset', 'perturbate-dataset', 'interpolate-dataset']:
         raise ValueError("Invalid method! Choose among perturbate-dataset or interpolate-dataset")
-    if args.dataset not in ['ffhq', 'celeba', 'celeba-hq', 'imagenet-100']:
-        raise ValueError("Invalid dataset! Choose among ffhq, celeba, 'celeba-hq', or imagenet-100")
+    if args.dataset not in ['ffhq', 'celeba', 'celeba-hq', 'imagenet-100', 'lsun-church']:
+        raise ValueError("Invalid dataset! Choose among ffhq, celeba, 'celeba-hq', 'lsun-church', or imagenet-100")
     
     gen_path = os.path.join(args.save_path, args.model, args.dataset)
     if not os.path.exists(gen_path):
