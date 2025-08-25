@@ -83,7 +83,7 @@ Ensure that all datasets are organized under the `./data/` directory.
 **Precompute** DINOv2 or CLIP representations for the above datasets using the following example command:
 
 ```bash
-python3 src/extract_rep.py --data="./data/celeba/img_align_celeba" --output="./data/celeba/rep"
+python3 extract_rep.py --data="./data/celeba/img_align_celeba" --output="./data/celeba/rep"
 ```
 ---
 
@@ -97,12 +97,12 @@ Based on [`CompVis/stable-diffusion-v1-4`](https://github.com/CompVis/stable-dif
 accelerate launch baseline.py --config="/path/to/config_file/.yaml"
 ```
 
-### 🔹 Representation-Conditioned Model
+### 🔹 Representation-Conditioned Diffusion Model (DINOv2 and unCLIP)
 
 Train with DINOv2 or CLIP representations:
 
 ```bash
-accelerate launch src/rep-ldm.py --config="/path/to/config_file/.yaml"
+accelerate launch rep-ldm.py --config="/path/to/config_file/.yaml"
 ```
 
 ### 🔹 Diffusion Auto-Encoder
