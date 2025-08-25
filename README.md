@@ -139,45 +139,64 @@ scancel [job-id]
 
 ## 🎨 Sampling
 
-### 1. Generate New Samples
+### 1. Generate New Synthetic Dataset
 
 ```bash
-python3 src/experiment.py
---dataset="{dataset_name}"
---data_path="data/{dataset_name}"
---output_path="output/{model_name}-{dataset_name}/images"
---model_path="output/{model_name}-{dataset_name}/model/{checkpoint_name}.pth"
+python3 experiment.py 
+--model_path="{model_path}" 
+--model="{model_name}" 
+--method="{method_name}" 
+--dataset="{dataset_name}" 
+--eval_dir="{data_path}" 
+--rep_dir="{rep_path}"
+
 ```
 
 
 ### 2. DDPM Inversion (for real image projection)
 
 ```bash
-python3 src/ddpm_inv.py
+python3 ddpm_inv.py
 --dataset="{dataset_name}"
---data_path="data/{dataset_name}"
---output_path="output/{model_name}-{dataset_name}/images"
---model_path="output/{model_name}-{dataset_name}/model/{checkpoint_name}.pt"
+--data_path="{data_path}"
+--output_path="{output_path}"
+--model_path="{model_path}/{checkpoint_name}.pt"
 ```
 
 ### 3. Attribute Manipulation
 
 ```bash
-python3 src/attribute_manipulation.py
---dataset="{dataset_name}"
---data_path="data/{dataset_name}"
---output_path="output/{model_name}-{dataset_name}/images"
---model_path="output/{model_name}-{dataset_name}/model/{checkpoint_name}.pt"
+python3 attribute_manipulation.py 
+--dataset="{dataset_name}" 
+--data_path="{data_path}" 
+--rep_path="{rep_path}" 
+--rep_attr_path="{rep_attr_path}" 
+--output_path="{output_path}" 
+--model_path="{model_path}/{checkpoint_name}.pt" 
+--attribute="{attribute_name}"
+
 ```
 
 ### 4. Interpolation in Representation Space
 
 ```bash
-python3 src/interpolate.py
---dataset="{dataset_name}"
---data_path="data/{dataset_name}"
---output_path="output/{model_name}-{dataset_name}/images"
---model_path="output/{model_name}-{dataset_name}/model/{checkpoint_name}.pt"
+python3 interpolate.py 
+--data_path="{data_path}" 
+--output_path="{output_path}" 
+--model_path="{model_path}" 
+--rep_path="{rep_path}"
+
+```
+
+### 5. Stochastic Variation (Different Initial Noise, Same Representation)
+
+```bash
+python3 src/stochastic_variation.py 
+--data_path="{data_path}" 
+--output_path="{output_path}" 
+--model_path="{model_path}" 
+--rep_path="{rep_path}"
+
 ```
 
 ---
