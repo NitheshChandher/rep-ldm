@@ -160,6 +160,7 @@ python3 ddpm_inv.py
 --dataset="{dataset_name}"
 --data_path="{data_path}"
 --output_path="{output_path}"
+--rep_path="{rep_path}"
 --model_path="{model_path}/{checkpoint_name}.pt"
 ```
 
@@ -169,8 +170,7 @@ python3 ddpm_inv.py
 python3 attribute_manipulation.py 
 --dataset="{dataset_name}" 
 --data_path="{data_path}" 
---rep_path="{rep_path}" 
---rep_attr_path="{rep_attr_path}" 
+--rep_path="{rep_path}"  
 --output_path="{output_path}" 
 --model_path="{model_path}/{checkpoint_name}.pt" 
 --attribute="{attribute_name}"

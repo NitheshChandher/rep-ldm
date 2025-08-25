@@ -62,8 +62,9 @@ def main():
     parser.add_argument("--data_path", type=str, required=True, help="Path to the dataset folder to load data")
     parser.add_argument("--output_path", type=str, required=True, help="Path to the output folder to store images")
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model checkpoint")
-    parser.add_argument("--rep_path", type=str, default="rep/ffhq/", help="Path to the directory containing dinov2 representations vectors")
-    parser.add_argument("--attribute", type=str, default="Blond_Hair", help="Attribute to manipulate (Check annotations/list_attr_celeba.csv)")
+    parser.add_argument("--rep_path", type=str, default="rep/ffhq/", help="Path to the directory containing dinov2/unclip/diffae representations vectors")
+    parser.add_argument("--rep_attr_path", type=str, default="annotations/list_attr_celeba.csv", help="Path to the attribute file")
+    parser.add_argument("--attribute", type=str, default="Blond_Hair", help="Attribute to manipulate (Check annotations/list_attr_celebahq.csv)")
     parser.add_argument("--index", type=int, default=0, help="Index of the first image in the dataset")
     parser.add_argument("--lamda", type=float, default=1.0, help="Weight for the attribute manipulation")
     parser.add_argument("--res", type=int, default=256, help="Resolution of the generated images")
@@ -132,7 +133,7 @@ def main():
         torch.cuda.empty_cache()
            
         # Perform attribute manipulation
-        attribute_emb = attribute_manipulation(directory_path="rep/celeba-clip", attr_file="annotations/list_attr_celeba.csv", attribute_name=args.attribute).to(device)
+        attribute_emb = attribute_manipulation(directory_path=args.rep_path, attr_file=args.rep_attr_path, attribute_name=args.attribute).to(device)
         attribute_emb = attribute_emb.unsqueeze(0).unsqueeze(1)
         z0 = z0 + args.lamda * attribute_emb
 
