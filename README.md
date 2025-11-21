@@ -1,4 +1,4 @@
-# Is Representation Conditioning the Key to Controllable Image Manipulation in Diffusion Models?
+# Evaluating Representation Conditioned Diffusion Models: A Comparative Study of Representation Encoders
 
 ##### [Nithesh Chandher Karthikeyan](https://liu.se/en/employee/nitch36), [Jonas Unger](https://liu.se/medarbetare/jonun48), and [Gabriel Eilertsen](https://liu.se/en/employee/gabei62)
 
@@ -6,7 +6,13 @@
 
 This is the official code repository for the paper:
 
-> **Is Representation Conditioning the Key to Controllable Image Manipulation in Diffusion Models?**
+> **Evaluating Representation Conditioned Diffusion Models: A Comparative Study of Representation Encoders**
+
+We propose a setup to train, sample and evaluate three Representation Conditioned Diffusion Models (RCDMs) using the representations from the following:
+
+- DINOv2
+- unCLIP
+- Diffusion Autoencoder (DIFFAE)
 
 ![Project Pipeline](/assets/pipeline.jpg)
 
